@@ -1,4 +1,4 @@
-# Fynd Order ETL - SDET Intern Practice Project
+# Fynd Order ETL 
 
 This project uses synthetic order data to demonstrate test design and release
 checks around a small ETL pipeline. It reads a CSV file, validates and cleans
