@@ -44,7 +44,7 @@ def run(tmp_path: Path, rows: list[dict], **kwargs):
 
 def test_generated_fixture_has_expected_input_count(tmp_path):
     frame = generate_data(tmp_path / "orders.csv")
-    assert len(frame) == 20015
+    assert len(frame) == 20020
 
 
 def test_generated_fixture_schema_matches_contract(tmp_path):
@@ -58,13 +58,13 @@ def test_generated_pipeline_has_expected_accounting(tmp_path):
     database = tmp_path / "target.sqlite"
     result = run_pipeline(source, database, tmp_path / "rejects.csv")
     assert (result.rows_read, result.rows_rejected, result.duplicates_removed, result.rows_loaded) == (
-        20015,
+        20020,
         15,
         5,
-        19995,
+        20000,
     )
     with sqlite3.connect(database) as db:
-        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 19995
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 20000
 
 
 def test_accounting_invariant_is_reported(tmp_path):

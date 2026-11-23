@@ -41,6 +41,55 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         )
         rows.append(row)
 
+    boundary_orders = [
+        {
+            "order_id": "ORD-EDGE-001",
+            "customer_id": "CUST-EDGE-001",
+            "sku": "sku-edge-001",
+            "quantity": 1,
+            "unit_price": 0.0,
+            "order_timestamp": "2026-01-04T00:00:00+05:30",
+            "updated_at": "2026-01-04T00:00:00+05:30",
+        },
+        {
+            "order_id": "ORD-EDGE-002",
+            "customer_id": "CUST-EDGE-002",
+            "sku": "sku-edge-002",
+            "quantity": 1000,
+            "unit_price": 0.01,
+            "order_timestamp": "2026-01-04T00:30:00-04:00",
+            "updated_at": "2026-01-04T00:30:00-04:00",
+        },
+        {
+            "order_id": "ORD-EDGE-003",
+            "customer_id": "CUST-EDGE-003",
+            "sku": "sku-edge-003",
+            "quantity": 2,
+            "unit_price": 999999.99,
+            "order_timestamp": "2026-01-05T12:00:00Z",
+            "updated_at": "2026-01-05T12:00:00Z",
+        },
+        {
+            "order_id": "ORD-EDGE-004",
+            "customer_id": "CUST-EDGE-004",
+            "sku": "sku-edge-004",
+            "quantity": 500,
+            "unit_price": 12.5,
+            "order_timestamp": "2026-01-05T09:00:00-07:00",
+            "updated_at": "2026-01-05T09:00:00-07:00",
+        },
+        {
+            "order_id": "ORD-EDGE-005",
+            "customer_id": "CUST-EDGE-005",
+            "sku": "sku-edge-005",
+            "quantity": 10,
+            "unit_price": 0.5,
+            "order_timestamp": "2026-01-06T00:00:00Z",
+            "updated_at": "2026-01-06T00:00:00Z",
+        },
+    ]
+    rows.extend(boundary_orders)
+
     defects = [
         {"sku": " bad-001 ", "quantity": ""},
         {"sku": "BAD-002", "quantity": "zero"},
