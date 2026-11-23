@@ -13,8 +13,8 @@ python -m src.report --database data/orders.sqlite
 python -m pytest -q --junitxml=test-results\pytest-results.xml
 ```
 
-The generated fixture contains exactly 20,015 source rows. The expected pipeline
-summary is 15 rejected, 5 duplicate rows removed, and 19,995 rows loaded. Each
+The generated fixture contains exactly 20,020 source rows. The expected pipeline
+summary is 15 rejected, 5 duplicate rows removed, and 20,000 rows loaded. Each
 run enforces `rows_read = rows_rejected + duplicates_removed + rows_loaded`.
 The test command saves a machine-readable JUnit report to
 `test-results\pytest-results.xml`.

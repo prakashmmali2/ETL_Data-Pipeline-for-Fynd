@@ -10,8 +10,12 @@ contract before the target is modified.
 ## Expected data behavior
 
 - Trim surrounding whitespace and normalize SKU values to uppercase.
-- Reject blank required fields, non-positive/non-integral quantities,
+- Require quantity to be a finite positive integer; accept the lower boundary
+  of 1 and larger values.
+- Require unit price to be finite and non-negative; zero is a valid boundary.
+- Reject blank required fields, fractional or non-positive quantities,
   negative or non-numeric prices, and invalid timestamps.
+- Accept parseable timezone offsets and store timestamps normalized to UTC.
 - Write rejected records to a CSV with exactly one rejection reason per row.
 - For repeated SKUs, retain the record with the latest `updated_at`; if times
   tie, retain the later source record.
@@ -22,9 +26,11 @@ contract before the target is modified.
 
 ## Generated fixture
 
-`python -m src.generate_data --output data/orders.csv` creates 20,015 rows:
-15 rejected records, 5 duplicate records removed, and 19,995 unique records
-loaded. The duplicate updates are deliberately out of source order.
+`python -m src.generate_data --output data/orders.csv` creates 20,020 rows:
+15 rejected records, 5 duplicate records removed, and 20,000 unique records
+loaded. The duplicate updates are deliberately out of source order. Five valid
+boundary records cover quantity 1 and 1,000, zero and one-cent prices,
+a large price, and timestamps with positive and negative UTC offsets.
 
 Run tests with `python -m pytest -q --junitxml=test-results\pytest-results.xml`.
 The JUnit XML report is saved at `test-results\pytest-results.xml`.
@@ -52,4 +58,6 @@ Fynd compatibility or prove behavior under production load.
 Run `python -m src.report --database data/orders.sqlite` after loading. The
 command exits non-zero if the table is missing, empty, has missing required
 columns, contains blank/null required values, has duplicate SKUs, or violates
-numeric value constraints.
+numeric value constraints. Its acceptance criteria allow quantity 1 and a
+zero price, and require all stored quantities and prices to satisfy the SQLite
+table constraints.
