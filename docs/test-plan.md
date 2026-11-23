@@ -53,6 +53,21 @@ The watcher integration test appends a valid record and verifies it becomes
 queryable in SQLite. This proves the demo detects an append; it does not certify
 Fynd compatibility or prove behavior under production load.
 
+## Assumptions, gaps, and not tested
+
+- The input is a local CSV with the exact seven-column contract above, and SKU
+  is the key used to deduplicate and upsert orders.
+- The fixture is synthetic. No Fynd API, production database, credentials, or
+  private challenge data are used.
+- The challenge-specific use case is provided after registration. This project
+  has not been checked against that private prompt or an unpublished rubric;
+  adapt it to the actual prompt before submitting.
+- No production-scale performance, concurrent writers, durable event
+  processing, or recovery after process/machine failure is tested. The watcher
+  is a local full-batch rerun demo, not a streaming service.
+- Store/channel identifiers, inventory movements, returns, authentication,
+  authorization, and integration behavior are outside the current model.
+
 ## Release gate
 
 Run `python -m src.report --database data/orders.sqlite` after loading. The

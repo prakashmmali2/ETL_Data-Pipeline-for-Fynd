@@ -26,3 +26,7 @@ The test suite includes deliberate-corruption checks and a local CSV append
 watcher check. It also demonstrates that the fixture accounting invariant
 holds and generated boundary records pass the quality gate. The CI workflow
 uploads the JUnit report as a downloadable artifact.
+
+This validates only the local synthetic-data practice project. It is not a
+FyndHacks submission and has not been evaluated against a private challenge
+prompt or scoring rubric.

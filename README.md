@@ -44,7 +44,19 @@ check; the JUnit report is uploaded as a workflow artifact.
 The [test plan](docs/test-plan.md) includes a manual smoke checklist and maps
 the role responsibilities to project evidence. The
 [defect log template](docs/defect-log-template.md) is provided for recording
-actual findings.
+actual findings. See the [submission checklist](docs/submission-checklist.md)
+for the evidence to include and a timed video outline. A locally rendered
+Indian-English [project walkthrough](docs/project-walkthrough.mp4) is included
+with male Indian-English narration and code-focused visuals.
+
+## Before submitting to FyndHacks
+
+This repository is a practice project, not a solution to an unpublished
+FyndHacks use case. Read the use case provided for your registered track and
+adapt the work to it before submitting. The current project has not been
+submitted through FyndHacks. Review the walkthrough, upload it to YouTube as
+Unlisted, add that URL to the submission form, and verify that FyndHacks
+confirms the submission.
 
 ## Watch mode
 
@@ -66,4 +78,5 @@ production latency guarantee. Stop it with Ctrl+C.
 - `src/report.py` runs the release check.
 - `tests/` contains the automated tests.
 - `docs/test-plan.md` describes the expected behavior and criteria.
+- `docs/submission-checklist.md` lists submission steps and video topics.
 - `.github/workflows/ci.yml` runs tests and the release check on GitHub.
