@@ -58,6 +58,30 @@ Fynd compatibility or prove behavior under production load.
 Run `python -m src.report --database data/orders.sqlite` after loading. The
 command exits non-zero if the table is missing, empty, has missing required
 columns, contains blank/null required values, has duplicate SKUs, or violates
-numeric value constraints. Its acceptance criteria allow quantity 1 and a
-zero price, and require all stored quantities and prices to satisfy the SQLite
-table constraints.
+numeric value constraints. Its acceptance criteria require numeric, finite,
+positive integral quantities and numeric, finite, non-negative prices. Quantity
+1 and a zero price are valid boundaries.
+
+## SDET Intern evidence
+
+The role description shared for this project emphasizes manual and automated
+testing, defect documentation, and build validation. This demo shows those
+skills; it does not claim to implement an unpublished hackathon use case or
+scoring rubric.
+
+| Responsibility | Project evidence |
+|---|---|
+| Design and run automated tests | `tests/test_etl_pipeline.py` covers the source contract, transformations, rejects, persistence, watcher, and release gate. |
+| Validate a build before release | The CI workflow runs the test suite, reloads the generated fixture, and runs the release gate. |
+| Review and share test results | Pytest writes a JUnit XML report that CI uploads as an artifact. |
+| Document defects | `docs/defect-log-template.md` is available for recording reproducible findings. The corrupted-target cases are intentional negative tests, not claims of production defects. |
+
+### Manual smoke checklist
+
+1. Generate the fixture and confirm that it contains 20,020 source rows.
+2. Run the ETL command and confirm 15 rejects, 5 duplicates removed, 20,000
+   rows loaded, and the accounting invariant holds.
+3. Run the release gate and confirm every check passes.
+4. Inspect `data/rejects.csv` and confirm each rejected row has one reason.
+5. Run pytest and confirm the JUnit report is written to
+   `test-results/pytest-results.xml`.

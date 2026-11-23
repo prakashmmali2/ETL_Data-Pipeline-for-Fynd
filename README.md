@@ -1,10 +1,12 @@
-# Fynd Order ETL Demo
+# Fynd Order ETL - SDET Intern Practice Project
 
-This project is a small, runnable ETL example built around synthetic order
-data. It reads a CSV file, validates and cleans each row, writes invalid rows
-to a rejects file, and loads valid orders into SQLite.
+This project uses synthetic order data to demonstrate test design and release
+checks around a small ETL pipeline. It reads a CSV file, validates and cleans
+each row, writes invalid rows to a rejects file, and loads valid orders into
+SQLite.
 
-It is a local demo, not a connection to Fynd's production systems.
+It is a local practice project, not a connection to Fynd's production systems
+or an official hackathon solution.
 
 ## Run it
 
@@ -33,9 +35,16 @@ UTC. Invalid rows and their rejection reasons are written to `data/rejects.csv`.
 ## Checks and tests
 
 The release check verifies the SQLite table schema, row count, required values,
-SKU uniqueness, and numeric ranges. It exits with an error if a check fails.
-The test suite covers the CSV contract, transformations, duplicate handling,
-upserts, rejects, quality checks, and the optional watcher.
+SKU uniqueness, and numeric ranges, including integral quantities and finite
+prices. It exits with an error if a check fails. The test suite covers the CSV
+contract, transformations, duplicate handling, upserts, rejects, quality
+checks, and the optional watcher. GitHub Actions runs the tests and release
+check; the JUnit report is uploaded as a workflow artifact.
+
+The [test plan](docs/test-plan.md) includes a manual smoke checklist and maps
+the role responsibilities to project evidence. The
+[defect log template](docs/defect-log-template.md) is provided for recording
+actual findings.
 
 ## Watch mode
 
