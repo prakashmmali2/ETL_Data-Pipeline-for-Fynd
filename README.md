@@ -1,9 +1,14 @@
-# ETL and workflow test harness
+# Fynd Order ETL Demo
 
-A small, repeatable orders pipeline demonstrating source contracts, pandas
-transformations, reject handling, SQLite upserts, data-quality gates, and CI.
+This project is a small, runnable ETL example built around synthetic order
+data. It reads a CSV file, validates and cleans each row, writes invalid rows
+to a rejects file, and loads valid orders into SQLite.
 
-## Quick start
+It is a local demo, not a connection to Fynd's production systems.
+
+## Run it
+
+Use Python 3.10 or later. From the project folder:
 
 ```powershell
 python -m pip install -r requirements.txt
@@ -13,28 +18,43 @@ python -m src.report --database data/orders.sqlite
 python -m pytest -q --junitxml=test-results\pytest-results.xml
 ```
 
-The generated fixture contains exactly 20,020 source rows. The expected pipeline
-summary is 15 rejected, 5 duplicate rows removed, and 20,000 rows loaded. Each
-run enforces `rows_read = rows_rejected + duplicates_removed + rows_loaded`.
-The test command saves a machine-readable JUnit report to
-`test-results\pytest-results.xml`.
+The generated sample has 20,020 rows. A normal run reads all rows, rejects 15,
+removes 5 duplicate SKUs, and loads 20,000 orders. The pipeline checks that
+every input row is accounted for:
 
-For a local near-real-time append demo, start
-`python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv --watch`.
-Append complete records to the CSV; the watcher checks for changes every
-second by default (`--poll-interval` changes the interval). It reruns the full
-batch, so this is not an incremental stream processor or a production latency
-guarantee. Stop it with Ctrl+C.
+```text
+rows_read = rows_rejected + duplicates_removed + rows_loaded
+```
 
-## Project layout
+The fixture includes valid boundary values such as quantity 1, a zero price,
+and timestamps with different UTC offsets. Accepted timestamps are stored in
+UTC. Invalid rows and their rejection reasons are written to `data/rejects.csv`.
 
-- `src/generate_data.py` creates deterministic sample data and known defects.
-- `src/etl_pipeline.py` checks the CSV contract, cleans and deduplicates rows,
-  writes rejects, and upserts records into SQLite by SKU.
-- `src/dq_checks.py` provides target table checks.
-- `src/report.py` is the release gate (exit code 1 on failure).
-- `tests/` covers the pipeline contract and edge cases.
-- `.github/workflows/ci.yml` runs tests and the end-to-end gate on pushes and
-  pull requests.
+## Checks and tests
 
-See [the test plan](docs/test-plan.md) and [defect-log template](docs/defect-log-template.md).
+The release check verifies the SQLite table schema, row count, required values,
+SKU uniqueness, and numeric ranges. It exits with an error if a check fails.
+The test suite covers the CSV contract, transformations, duplicate handling,
+upserts, rejects, quality checks, and the optional watcher.
+
+## Watch mode
+
+To try the local append demo:
+
+```powershell
+python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv --watch
+```
+
+Append complete CSV rows while it is running. The watcher reruns the full
+batch when the file changes; it is not an incremental stream processor or a
+production latency guarantee. Stop it with Ctrl+C.
+
+## Project files
+
+- `src/generate_data.py` creates the deterministic sample CSV.
+- `src/etl_pipeline.py` validates, transforms, and loads orders.
+- `src/dq_checks.py` contains the SQLite quality checks.
+- `src/report.py` runs the release check.
+- `tests/` contains the automated tests.
+- `docs/test-plan.md` describes the expected behavior and criteria.
+- `.github/workflows/ci.yml` runs tests and the release check on GitHub.
