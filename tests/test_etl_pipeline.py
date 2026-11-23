@@ -263,6 +263,10 @@ def test_quality_checks_pass_for_pipeline_output(tmp_path):
         ([valid_row("SKU-A"), valid_row("SKU-A")], "duplicates"),
         ([valid_row(customer_id=" ")], "null_handling"),
         ([valid_row(quantity=0)], "value_ranges"),
+        ([valid_row(quantity=1.5)], "value_ranges"),
+        ([valid_row(quantity=float("inf"))], "value_ranges"),
+        ([valid_row(unit_price=float("inf"))], "value_ranges"),
+        ([valid_row(unit_price="not-a-number")], "value_ranges"),
     ],
 )
 def test_quality_gate_catches_deliberately_corrupted_targets(tmp_path, rows, expected_failure):

@@ -61,7 +61,15 @@ def check_table(database: str | Path, table_name: str = "orders") -> list[CheckR
             f'SELECT COUNT(*) FROM (SELECT sku FROM "{table_name}" GROUP BY sku HAVING COUNT(*) > 1)'
         ).fetchone()[0]
         invalid_count = connection.execute(
-            f'SELECT COUNT(*) FROM "{table_name}" WHERE quantity <= 0 OR unit_price < 0'
+            f"""
+            SELECT COUNT(*) FROM "{table_name}"
+            WHERE typeof(quantity) NOT IN ('integer', 'real')
+               OR quantity <= 0
+               OR quantity != CAST(quantity AS INTEGER)
+               OR typeof(unit_price) NOT IN ('integer', 'real')
+               OR unit_price < 0
+               OR ABS(unit_price) = 1e999
+            """
         ).fetchone()[0]
 
     return [
