@@ -67,6 +67,36 @@ def test_generated_pipeline_has_expected_accounting(tmp_path):
         assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 20000
 
 
+def test_generated_fixture_loads_valid_numeric_and_timezone_boundaries(tmp_path):
+    source = tmp_path / "orders.csv"
+    generate_data(source)
+    database = tmp_path / "target.sqlite"
+    result = run_pipeline(source, database, tmp_path / "rejects.csv")
+
+    assert result.rows_rejected == 15
+    with sqlite3.connect(database) as db:
+        rows = db.execute(
+            """
+            SELECT sku, quantity, unit_price, order_timestamp
+            FROM orders
+            WHERE sku LIKE 'SKU-EDGE-%'
+            ORDER BY sku
+            """
+        ).fetchall()
+
+    assert [row[0] for row in rows] == [f"SKU-EDGE-{index:03d}" for index in range(1, 6)]
+    assert [row[1] for row in rows] == [1, 1000, 2, 500, 10]
+    assert [row[2] for row in rows] == pytest.approx([0.0, 0.01, 999999.99, 12.5, 0.5])
+    assert [row[3] for row in rows] == [
+        "2026-01-03T18:30:00Z",
+        "2026-01-04T04:30:00Z",
+        "2026-01-05T12:00:00Z",
+        "2026-01-05T16:00:00Z",
+        "2026-01-06T00:00:00Z",
+    ]
+    assert all(check.passed for check in check_table(database))
+
+
 def test_accounting_invariant_is_reported(tmp_path):
     result = run(tmp_path, [valid_row()])
     assert result.rows_read == result.accounted_rows == 1
