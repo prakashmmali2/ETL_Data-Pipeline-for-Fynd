@@ -5,6 +5,10 @@ data pipeline. It demonstrates how to validate order data, reject bad rows,
 load reliable records into SQLite, and verify that a customer sees the order
 that was actually saved.
 
+## Watch the project overview
+
+[Play the 7:39 animated walkthrough](docs/Project%20Overview%20Video.mp4)
+
 This is a synthetic-data learning project. It is not connected to Fynd
 production systems or an unpublished FyndHacks challenge.
 
