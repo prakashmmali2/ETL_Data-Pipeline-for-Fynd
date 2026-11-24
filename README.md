@@ -1,78 +1,146 @@
-## Order ETL Data Pipeline – Test Automation & Quality Engineering : Project Overview
+# Order ETL Data Pipeline - Test Automation & Quality Engineering
 
-This project demonstrates the development and testing of a small ETL (Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
+## Project overview
 
-The pipeline reads order data from a CSV file, validates and transforms records, handles duplicate entries, separates invalid records, and stores valid data in an SQLite database.
+This project demonstrates the development and testing of a small ETL
+(Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
 
-The main focus of this project is software testing, data quality, and release validation, following practical SDET workflows.
+The pipeline reads order data from a CSV file, validates and transforms
+records, handles duplicate SKUs, separates invalid records with rejection
+reasons, and stores valid data in an SQLite database. The focus is software
+testing, data quality, and release validation using practical SDET workflows.
 
+This is a local practice project using synthetic data. It is not connected to
+Fynd production systems or an official FyndHacks solution.
 
-## Tech Stack
+## Tech stack
 
-Programming: Python 3.10+
+| Area | Technology |
+|---|---|
+| Programming | Python 3.10+ |
+| Database | SQLite |
+| Data format | CSV |
+| Testing | pytest |
+| CI/CD | GitHub Actions |
+| Test reporting | JUnit XML |
 
-Database: SQLite
+## Project workflow
 
-Data Format: CSV
+1. Generate deterministic synthetic order data.
+2. Read the CSV and validate its seven-column schema.
+3. Normalize and validate each row.
+4. Reject invalid rows with clear reasons.
+5. Resolve duplicate SKUs deterministically, keeping the latest update.
+6. Load valid records into SQLite using an upsert.
+7. Check row accounting, data quality, and release readiness.
+8. Run automated tests and produce a JUnit report.
 
-Testing: Pytest
+## Setup and execution
 
-CI/CD: GitHub Actions
+Clone the repository and navigate to the project directory:
 
-Test Reporting: JUnit XML
-
-
-## Project Workflow
-
-- Generate synthetic order data.
-
-- Read and validate CSV records.
-
-- Apply data cleaning and transformation.
-
-- Identify and remove duplicate SKUs.
-
-- Store invalid records with rejection reasons.
-
-- Load valid records into SQLite.
-
-- Execute automated tests and data quality checks.
-
-- Generate test reports and verify release readiness.
-
-## Run it
-
-Use Python 3.10 or later. From the project folder:
-
-python -m pip install -r requirements.txt python -m src.generate_data --output data/orders.csv python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv python -m src.report --database data/orders.sqlite python -m pytest -q --junitxml=test-results\pytest-results.xml
-
-The generated sample has 20,020 rows. A normal run reads all rows, rejects 15, removes 5 duplicate SKUs, and loads 20,000 orders. The pipeline checks that every input row is accounted for:
-```ini
-rows_read = rows_rejected + duplicates_removed + rows_loaded
-
+```powershell
+git clone https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd.git
+cd ETL_Data-Pipeline-for-Fynd
 ```
 
-The fixture includes valid boundary values such as quantity 1, a zero price, and timestamps with different UTC offsets. Accepted timestamps are stored in UTC. Invalid rows and their rejection reasons are written to `data/rejects.csv`.
+Install dependencies:
 
-## Checks and tests
+```powershell
+python -m pip install -r requirements.txt
+```
 
-The release check verifies the SQLite table schema, row count, required values, SKU uniqueness, and numeric ranges, including integral quantities and finite prices. It exits with an error if a check fails. The test suite covers the CSV contract, transformations, duplicate handling, upserts, rejects, quality checks, and the optional watcher. GitHub Actions runs the tests and release check; the JUnit report is uploaded as a workflow artifact.
+Generate the sample data:
 
+```powershell
+python -m src.generate_data --output data/orders.csv
+```
 
+Run the ETL pipeline:
 
-The [test plan](https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd/blob/main/docs/test-plan.md) includes a manual smoke checklist and maps the role responsibilities to project evidence. The [defect log template](https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd/blob/main/docs/defect-log-template.md) is provided for recording actual findings. See the [submission checklist](https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd/blob/main/docs/submission-checklist.md) for the evidence to include and a timed video outline. A locally rendered Indian-English [project walkthrough](https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd/blob/main/docs/project-walkthrough.mp4) is included with male Indian-English narration and code-focused visuals.
+```powershell
+python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv
+```
 
-## Before submitting to FyndHacks
+Generate the quality report:
 
-This repository is a practice project, not a solution to an unpublished FyndHacks use case. Read the use case provided for your registered track and adapt the work to it before submitting. The current project has not been submitted through FyndHacks. Review the walkthrough, upload it to YouTube as Unlisted, add that URL to the submission form, and verify that FyndHacks confirms the submission.
+```powershell
+python -m src.report --database data/orders.sqlite
+```
+
+Run the automated tests and write a JUnit XML report:
+
+```powershell
+python -m pytest -q --junitxml=test-results/pytest-results.xml
+```
+
+## Data quality validation
+
+The generated sample contains 20,020 rows. A normal run produces:
+
+| Validation | Expected result |
+|---|---:|
+| Total records read | 20,020 |
+| Rejected records | 15 |
+| Duplicate records removed | 5 |
+| Successfully loaded records | 20,000 |
+
+Every input row must be accounted for:
+
+```text
+rows_read = rows_rejected + duplicates_removed + rows_loaded
+```
+
+The fixture includes valid boundary values such as quantity 1, a zero price,
+and timestamps with different UTC offsets. Accepted timestamps are stored in
+UTC. Invalid rows and their rejection reasons are written to
+`data/rejects.csv`.
+
+The release check verifies the SQLite schema, row count, required values, SKU
+uniqueness, and numeric ranges, including integral quantities and finite
+prices. It exits with an error if a check fails. The tests cover the CSV
+contract, transformations, duplicate handling, upserts, rejects, quality
+checks, and the optional watcher. GitHub Actions runs the tests and release
+check; the JUnit report is uploaded as a workflow artifact.
+
+## Walkthrough video
+
+The [animated project walkthrough](docs/Project%20Overview%20Video.mp4) uses
+the original Indian-English narration and illustrates the ETL flow,
+validation, duplicate resolution, SQLite upsert, row accounting, quality
+checks, and test coverage. The original source video is retained.
+
+Rebuild the animated video from the project directory with:
+
+```powershell
+python docs\generate_indian_walkthrough.py
+```
+
+The [test plan](docs/test-plan.md) describes expected behavior and manual
+checks. The [defect log template](docs/defect-log-template.md) is provided for
+recording findings. See the [submission checklist](docs/submission-checklist.md)
+for evidence requirements and the walkthrough outline.
 
 ## Watch mode
 
 To try the local append demo:
 
+```powershell
 python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv --watch
+```
 
-Append complete CSV rows while it is running. The watcher reruns the full batch when the file changes; it is not an incremental stream processor or a production latency guarantee. Stop it with Ctrl+C.
+Append complete CSV rows while it is running. The watcher reruns the full
+batch when the file changes; it is not an incremental stream processor or a
+production latency guarantee. Stop it with Ctrl+C.
+
+## Before submitting to FyndHacks
+
+This repository is a practice project, not a solution to an unpublished
+FyndHacks use case. Read the use case provided for your registered track and
+adapt the work to it before submitting. This project has not been evaluated
+against the private challenge prompt. Review the walkthrough, upload it to
+YouTube as Unlisted, add its URL to the submission form, and verify that
+FyndHacks confirms the submission.
 
 ## Project files
 
@@ -84,18 +152,3 @@ Append complete CSV rows while it is running. The watcher reruns the full batch 
 - `docs/test-plan.md` describes the expected behavior and criteria.
 - `docs/submission-checklist.md` lists submission steps and video topics.
 - `.github/workflows/ci.yml` runs tests and the release check on GitHub.
-
-
-## Data Quality Validation
-
-The pipeline processes 20,020 sample records.
-
-Validation                                                 Expected Result
-
-Total records read                                             20,020
-
-Rejected records                                                 15
-
-Duplicate records removed                                        5
-
-Successfully loaded records                                    20,000

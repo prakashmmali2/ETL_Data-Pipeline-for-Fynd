@@ -27,31 +27,31 @@ integration or as a completed FyndHacks submission.
 - [ ] Use only synthetic or challenge-provided data. Check that the repository,
   ZIP, reports, and video contain no credentials, personal data, or
   proprietary material.
-- [ ] Review the 8-minute-59-second `docs/project-walkthrough.mp4` and confirm
-  it accurately represents your project. The narration is locally synthesized
-  and the slides are AI-assisted; edit or replace the draft if needed.
+- [ ] Review the 6-minute-53-second
+  `docs/Project Overview Video.mp4` and confirm it accurately represents
+  your project. The original Indian-English narration is preserved, with new
+  animated visuals; review the draft before sharing.
 - [ ] Upload the reviewed video to YouTube as **Unlisted** and add its URL to
   the submission form. The video has not been uploaded and no YouTube URL is
   included in this repository.
 - [ ] Submit through FyndHacks before your personal deadline and verify the
   page confirms that the submission was received.
 
-## Suggested 8-minute walkthrough
+## Animated walkthrough sections
 
-1. **0:00-0:45 - Goal and scope:** Identify the SDET Intern practice project,
-   explain that the records are synthetic, and state the assumptions.
-2. **0:45-1:45 - Design:** Show the CSV input, validation/transform steps,
-   rejects output, SQLite target, and release gate.
-3. **1:45-3:00 - Data-quality behavior:** Explain invalid-row reasons,
-   duplicate-SKU resolution, UTC normalization, and the row-accounting rule.
-4. **3:00-5:15 - Tests:** Show representative positive, boundary, and negative
-   tests, including the numeric release-gate checks.
-5. **5:15-6:30 - Run and evidence:** Run the documented commands and show the
-   passing test summary, JUnit report, and release-gate result.
-6. **6:30-7:30 - Defects and limitations:** Explain the defect-log status and
-   what is not covered, including production integrations and scale.
-7. **7:30-8:00 - Close:** Summarize what you would adapt for the actual
-   challenge prompt and point judges to the repository evidence.
+The narration and animated scenes follow these approximate section boundaries:
+
+1. **0:00-0:50 - Goal and scope:** Identify the SDET Intern practice project
+   and synthetic-data boundaries.
+2. **0:50-1:34 - Source contract:** Explain the seven-column CSV schema.
+3. **1:34-2:18 - Validation:** Show normalization, valid rows, and rejects.
+4. **2:18-2:56 - Deduplication:** Show stable ordering and latest-update wins.
+5. **2:56-3:36 - Loading:** Explain the SQLite upsert and constraints.
+6. **3:36-4:17 - Accounting:** Reconcile rejected, duplicate, and loaded rows.
+7. **4:17-4:52 - Quality gate:** Show the post-load checks.
+8. **4:52-5:31 - Tests:** Cover contract, boundary, negative, and release tests.
+9. **5:31-6:11 - Run evidence:** Show the sample counts and validation output.
+10. **6:11-6:53 - Close:** State limitations and submission checks.
 
 Keep the video within 7-10 minutes, avoid showing secrets or personal data, and
 test the unlisted link from a signed-out browser before sharing it.
