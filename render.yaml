@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fynd-etl-checkout-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: "python -m src.store_server --host 0.0.0.0 --port $PORT --data-dir /tmp/fynd-etl-store"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
