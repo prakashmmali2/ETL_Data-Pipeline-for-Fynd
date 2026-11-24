@@ -1,28 +1,97 @@
-# Fynd Order ETL 
+ETL Data Pipeline – Test Automation & Quality Engineering
 
-This project uses synthetic order data to demonstrate test design and release
-checks around a small ETL pipeline. It reads a CSV file, validates and cleans
-each row, writes invalid rows to a rejects file, and loads valid orders into
-SQLite.
+Project Overview
 
-It is a local practice project, not a connection to Fynd's production systems
-or an official hackathon solution.
+This project demonstrates the development and testing of a small ETL (Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
 
-## Run it
+The pipeline reads order data from a CSV file, validates and transforms records, handles duplicate entries, separates invalid records, and stores valid data in an SQLite database.
 
-Use Python 3.10 or later. From the project folder:
+The main focus of this project is software testing, data quality, and release validation, following practical SDET workflows.
 
-```powershell
+Tech Stack
+
+Programming: Python 3.10+
+
+Database: SQLite
+
+Data Format: CSV
+
+Testing: Pytest
+
+CI/CD: GitHub Actions
+
+Test Reporting: JUnit XML
+
+Project Workflow
+
+Generate synthetic order data.
+
+Read and validate CSV records.
+
+Apply data cleaning and transformation.
+
+Identify and remove duplicate SKUs.
+
+Store invalid records with rejection reasons.
+
+Load valid records into SQLite.
+
+Execute automated tests and data quality checks.
+
+Generate test reports and verify release readiness.
+
+Setup and Execution
+
+Clone the repository and navigate to the project directory.
+
+git clone https://github.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd.git
+cd ETL_Data-Pipeline-for-Fynd
+
+Install dependencies:
+
 python -m pip install -r requirements.txt
-python -m src.generate_data --output data/orders.csv
-python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv
-python -m src.report --database data/orders.sqlite
-python -m pytest -q --junitxml=test-results\pytest-results.xml
-```
 
-The generated sample has 20,020 rows. A normal run reads all rows, rejects 15,
-removes 5 duplicate SKUs, and loads 20,000 orders. The pipeline checks that
-every input row is accounted for:
+Generate sample data:
+
+python -m src.generate_data --output data/orders.csv
+
+Run the ETL pipeline:
+
+python -m src.etl_pipeline data/orders.csv --database data/orders.sqlite --rejects data/rejects.csv
+
+Generate the quality report:
+
+python -m src.report --database data/orders.sqlite
+
+Run automated tests:
+
+python -m pytest -q --junitxml=test-results/pytest-results.xml
+
+Test Scenarios
+
+The project covers the following testing scenarios:
+
+CSV file structure and required column validation.
+
+Valid and invalid order records.
+
+Missing and incorrect field values.
+
+Boundary value testing for quantity and price.
+
+Timestamp validation and UTC conversion.
+
+Duplicate SKU detection and handling.
+
+Database insertion and upsert operations.
+
+Rejected record validation and reason tracking.
+
+SQLite schema and data integrity checks.
+
+Numeric range and data type validation.
+
+Watch mode execution and file change handling.
 
 ```text
 rows_read = rows_rejected + duplicates_removed + rows_loaded
