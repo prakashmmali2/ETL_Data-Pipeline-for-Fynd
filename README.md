@@ -1,10 +1,32 @@
-# Fynd Order ETL
+## Order ETL ETL Data Pipeline – Test Automation & Quality Engineering : Project Overview
 
-This project uses synthetic order data to demonstrate test design and release checks around a small ETL pipeline. It reads a CSV file, validates and cleans each row, writes invalid rows to a rejects file, and loads valid orders into SQLite.
+This project demonstrates the development and testing of a small ETL (Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
+
+The pipeline reads order data from a CSV file, validates and transforms records, handles duplicate entries, separates invalid records, and stores valid data in an SQLite database.
+
+The main focus of this project is software testing, data quality, and release validation, following practical SDET workflows.
 
 
+## Tech Stack
 
-It is a local practice project, not a connection to Fynd's production systems or an official hackathon solution.
+Programming: Python 3.10+
+Database: SQLite
+Data Format: CSV
+Testing: Pytest
+CI/CD: GitHub Actions
+Test Reporting: JUnit XML
+
+
+## Project Workflow
+
+- Generate synthetic order data.
+- Read and validate CSV records.
+- Apply data cleaning and transformation.
+- Identify and remove duplicate SKUs.
+- Store invalid records with rejection reasons.
+- Load valid records into SQLite.
+- Execute automated tests and data quality checks.
+- Generate test reports and verify release readiness.
 
 ## Run it
 
@@ -50,3 +72,18 @@ Append complete CSV rows while it is running. The watcher reruns the full batch 
 - `docs/test-plan.md` describes the expected behavior and criteria.
 - `docs/submission-checklist.md` lists submission steps and video topics.
 - `.github/workflows/ci.yml` runs tests and the release check on GitHub.
+
+
+## Data Quality Validation
+
+The pipeline processes 20,020 sample records.
+
+Validation                                                 Expected Result
+
+Total records read                                             20,020
+
+Rejected records                                                 15
+
+Duplicate records removed                                        5
+-------------------------------------------------------------------------------
+Successfully loaded records                                    20,000
