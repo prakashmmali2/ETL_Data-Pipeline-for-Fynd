@@ -7,7 +7,12 @@ that was actually saved.
 
 ## Watch the project overview
 
-[Play the 7:39 animated walkthrough](docs/Project%20Overview%20Video.mp4)
+<video controls preload="metadata" width="100%">
+  <source src="https://raw.githubusercontent.com/prakashmmali2/ETL_Data-Pipeline-for-Fynd/main/docs/Project%20Overview%20Video.mp4" type="video/mp4">
+  Your browser does not support embedded video.
+</video>
+
+[Open or download the video](docs/Project%20Overview%20Video.mp4)
 
 This is a synthetic-data learning project. It is not connected to Fynd
 production systems or an unpublished FyndHacks challenge.
