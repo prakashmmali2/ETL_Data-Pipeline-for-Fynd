@@ -21,10 +21,15 @@ Fynd production systems or an official FyndHacks solution.
 | Database | SQLite |
 | Data format | CSV |
 | Testing | pytest |
+| Browser tests | Playwright + Chromium |
 | CI/CD | GitHub Actions |
 | Test reporting | JUnit XML |
 
 ## Project workflow
+
+This repository keeps two independent but complementary test workflows.
+
+### ETL data-quality workflow
 
 1. Generate deterministic synthetic order data.
 2. Read the CSV and validate its seven-column schema.
@@ -34,6 +39,15 @@ Fynd production systems or an official FyndHacks solution.
 6. Load valid records into SQLite using an upsert.
 7. Check row accounting, data quality, and release readiness.
 8. Run automated tests and produce a JUnit report.
+
+### Checkout browser workflow
+
+1. Add either of the two fixed-price synthetic products.
+2. Change quantities or remove items and verify the displayed totals.
+3. Enter a required customer name and place the order.
+4. Verify empty-cart and missing-name validation, then confirm one order with a
+   reference.
+5. Run isolated Playwright checks in Chromium.
 
 ## Setup and execution
 
@@ -66,6 +80,12 @@ Generate the quality report:
 
 ```powershell
 python -m src.report --database data/orders.sqlite
+```
+
+Install Playwright's Chromium browser once before running browser tests:
+
+```powershell
+python -m playwright install chromium
 ```
 
 Run the automated tests and write a JUnit XML report:
@@ -103,6 +123,37 @@ contract, transformations, duplicate handling, upserts, rejects, quality
 checks, and the optional watcher. GitHub Actions runs the tests and release
 check; the JUnit report is uploaded as a workflow artifact.
 
+## Mini checkout browser demo
+
+The independent `checkout/` page demonstrates a two-product checkout with
+fixed prices, quantity controls, validation, and a single order confirmation.
+It uses only local files: there is no payment flow, backend, database, or
+external service. It complements the ETL workflow without changing it.
+
+Run the page from the repository root:
+
+```powershell
+python -m http.server 8000 --directory checkout
+```
+
+Open <http://127.0.0.1:8000> in a browser. Install Chromium as described in
+[Setup and execution](#setup-and-execution) before running browser tests.
+
+Run the three isolated checkout browser checks:
+
+```powershell
+python -m pytest -q tests/test_checkout_browser.py
+```
+
+Run the ETL and checkout tests together and save their JUnit report:
+
+```powershell
+python -m pytest -q --junitxml=test-results/pytest-results.xml
+```
+
+The [checkout test plan and results](docs/checkout-test-plan.md) document
+automated coverage and the manual empty-cart and rapid double-click checks.
+
 ## Walkthrough video
 
 The [animated project walkthrough](docs/Project%20Overview%20Video.mp4) uses
@@ -116,10 +167,14 @@ Rebuild the animated video from the project directory with:
 python docs\generate_indian_walkthrough.py
 ```
 
-The [test plan](docs/test-plan.md) describes expected behavior and manual
-checks. The [defect log template](docs/defect-log-template.md) is provided for
-recording findings. See the [submission checklist](docs/submission-checklist.md)
-for evidence requirements and the walkthrough outline.
+The [ETL test plan](docs/test-plan.md) describes expected behavior and manual
+checks. The [checkout test plan and results](docs/checkout-test-plan.md) records
+the browser and manual checkout outcomes. The
+[validation results](docs/validation-results.md) summarize the dataset and
+combined test runs. The [defect log template](docs/defect-log-template.md) is
+provided for recording findings. See the
+[submission checklist](docs/submission-checklist.md) for evidence requirements
+and the walkthrough outline.
 
 ## Watch mode
 
@@ -150,5 +205,8 @@ FyndHacks confirms the submission.
 - `src/report.py` runs the release check.
 - `tests/` contains the automated tests.
 - `docs/test-plan.md` describes the expected behavior and criteria.
+- `checkout/` contains the standalone checkout page.
+- `tests/test_checkout_browser.py` automates checkout behavior in Chromium.
+- `docs/checkout-test-plan.md` records checkout risks, tests, and results.
 - `docs/submission-checklist.md` lists submission steps and video topics.
 - `.github/workflows/ci.yml` runs tests and the release check on GitHub.

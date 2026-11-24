@@ -1,4 +1,4 @@
-name: ETL test harness
+name: ETL and checkout test harness
 
 on:
   push:
@@ -14,6 +14,8 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: python -m pip install -r requirements.txt
+      - name: Install Chromium for checkout browser tests
+        run: python -m playwright install --with-deps chromium
       - run: python -m pytest -q --junitxml=test-results/pytest-results.xml
       - name: Upload JUnit report
         if: always()

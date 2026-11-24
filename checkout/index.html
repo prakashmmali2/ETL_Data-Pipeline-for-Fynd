@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f4ef">
+    <title>Fieldnotes Supply | Checkout demo</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="Fieldnotes Supply home">
+        <span class="brand-mark" aria-hidden="true">F</span>
+        <span>fieldnotes<span class="brand-light"> supply</span></span>
+      </a>
+      <span class="demo-label"><span class="status-dot" aria-hidden="true"></span> CHECKOUT DEMO</span>
+    </header>
+
+    <main class="page-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">A SMALL, TESTABLE STORE</p>
+        <h1 id="page-title">Checkout, made clear.</h1>
+        <p class="intro-copy">A simple order flow with honest totals and helpful feedback.</p>
+      </section>
+
+      <div class="checkout-grid">
+        <section class="products-panel" aria-labelledby="products-heading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">THE COLLECTION</p>
+              <h2 id="products-heading">Choose your goods</h2>
+            </div>
+            <span class="item-count">2 items</span>
+          </div>
+
+          <div class="product-list">
+            <article class="product-card">
+              <div class="product-art tote-art" aria-hidden="true">
+                <svg viewBox="0 0 180 150" role="presentation">
+                  <path d="M56 48V35a34 34 0 0 1 68 0v13" class="tote-handle"/>
+                  <path d="M43 47h94l9 88H34z" class="tote-body"/>
+                  <path d="M65 68h50v34H65z" class="tote-pocket"/>
+                  <path d="M76 83h28" class="tote-stitch"/>
+                </svg>
+                <span class="art-caption">01 / CARRY</span>
+              </div>
+              <div class="product-info">
+                <div class="product-title-row">
+                  <div>
+                    <p class="product-category">EVERYDAY GOODS</p>
+                    <h3>Canvas Tote</h3>
+                  </div>
+                  <span class="product-price">$24.50</span>
+                </div>
+                <p class="product-description">A sturdy cotton carry-all for the everyday.</p>
+                <button class="add-button" type="button" data-add-product="tote">
+                  Add Canvas Tote to cart <span aria-hidden="true">+</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="product-card">
+              <div class="product-art mug-art" aria-hidden="true">
+                <svg viewBox="0 0 180 150" role="presentation">
+                  <path d="M48 46h76v72a20 20 0 0 1-20 20H68a20 20 0 0 1-20-20z" class="mug-body"/>
+                  <path d="M124 60h11a22 22 0 0 1 0 44h-11" class="mug-handle"/>
+                  <path d="M62 64h48" class="mug-glaze"/>
+                  <path d="M70 87h30" class="mug-stamp"/>
+                </svg>
+                <span class="art-caption">02 / SIP</span>
+              </div>
+              <div class="product-info">
+                <div class="product-title-row">
+                  <div>
+                    <p class="product-category">SLOW MORNINGS</p>
+                    <h3>Stoneware Mug</h3>
+                  </div>
+                  <span class="product-price">$12.00</span>
+                </div>
+                <p class="product-description">A hand-finished mug for your favorite pour.</p>
+                <button class="add-button" type="button" data-add-product="mug">
+                  Add Stoneware Mug to cart <span aria-hidden="true">+</span>
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <p class="catalog-note"><span aria-hidden="true">✳</span> Fixed prices · Synthetic demo products</p>
+        </section>
+
+        <aside class="order-panel" aria-labelledby="order-heading">
+          <div class="section-heading order-heading">
+            <div>
+              <p class="eyebrow">YOUR ORDER</p>
+              <h2 id="order-heading">Order summary</h2>
+            </div>
+            <span class="bag-icon" aria-hidden="true">▱</span>
+          </div>
+
+          <div class="cart-content">
+            <p id="empty-cart" class="empty-cart">Your cart is empty. Add something you love.</p>
+            <ul id="cart-items" class="cart-items" aria-label="Items in your cart"></ul>
+          </div>
+
+          <div class="order-total">
+            <span>Order total</span>
+            <span id="order-total" class="total-amount" data-testid="order-total" aria-live="polite" aria-atomic="true">$0.00</span>
+          </div>
+
+          <form id="checkout-form" class="checkout-form" novalidate>
+            <label for="customer-name">Your name <span aria-hidden="true">*</span></label>
+            <input
+              id="customer-name"
+              name="customerName"
+              type="text"
+              autocomplete="name"
+              aria-describedby="name-hint checkout-error"
+              aria-required="true"
+              required
+              placeholder="e.g. Alex Morgan"
+            >
+            <p id="name-hint" class="field-hint">We’ll use this on your order confirmation.</p>
+            <p id="checkout-error" class="error-message" role="alert" hidden></p>
+            <button id="place-order" class="place-order" type="submit">Place order <span aria-hidden="true">→</span></button>
+          </form>
+
+          <section id="order-confirmation" class="confirmation" role="status" aria-live="polite" aria-atomic="true" hidden>
+            <span class="confirmation-check" aria-hidden="true">✓</span>
+            <div>
+              <h3 id="confirmation-title"></h3>
+              <p id="confirmation-reference"></p>
+            </div>
+          </section>
+
+          <p class="privacy-note"><span aria-hidden="true">◇</span> Demo only. No payment or personal data is sent anywhere.</p>
+        </aside>
+      </div>
+
+      <footer class="page-footer">
+        <span>FIELDNOTES SUPPLY</span>
+        <span>Made for clear totals and calmer checkouts.</span>
+      </footer>
+    </main>
+  </body>
+</html>

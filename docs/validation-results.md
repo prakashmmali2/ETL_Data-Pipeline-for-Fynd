@@ -1,6 +1,7 @@
 # Validation results
 
-Validated on 2026-11-23 with Python 3.12.10.
+ETL dataset validation completed on 2026-11-23 with Python 3.12.10. Checkout
+browser validation completed on 2026-11-24 with Python 3.11.9.
 
 ## Dataset
 
@@ -18,7 +19,10 @@ Validated on 2026-11-23 with Python 3.12.10.
 
 ## Test report
 
-- Test suite: 36 passed
+- ETL test cases: 36 passed
+- Checkout browser cases: 3 passed; see
+  [checkout test plan and results](checkout-test-plan.md).
+- Combined test suite: 39 passed
 - JUnit report: `test-results/pytest-results.xml`
 - Release gate: passed
 
