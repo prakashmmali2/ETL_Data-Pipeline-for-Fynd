@@ -77,7 +77,7 @@ numeric value constraints. Its acceptance criteria require numeric, finite,
 positive integral quantities and numeric, finite, non-negative prices. Quantity
 1 and a zero price are valid boundaries.
 
-## SDET Intern evidence
+## SDET Role evidence
 
 The role description shared for this project emphasizes manual and automated
 testing, defect documentation, and build validation. This demo shows those
