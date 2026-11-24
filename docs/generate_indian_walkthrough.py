@@ -1,47 +1,106 @@
 from __future__ import annotations
 
+import asyncio
 import bisect
-import re
+import math
 import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
 
+import edge_tts
 import imageio_ffmpeg
-from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
+from PIL import Image, ImageDraw, ImageFont
+from edge_tts.exceptions import NoAudioReceived
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-SOURCE = DOCS / "project-walkthrough-indian.mp4"
 OUTPUT = DOCS / "Project Overview Video.mp4"
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+VOICE = "en-IN-PrabhatNeural"
+VOICE_RATE = "+3%"
 
 W, H = 1280, 720
 FPS = 12
-VIDEO_FPS = 24
-BG = "#080D1C"
-GRID = "#10192C"
-PANEL = "#121D33"
-PANEL_LIGHT = "#192943"
-WHITE = "#F5F8FF"
-MUTED = "#9EACC5"
-CYAN = "#54D7FF"
-GREEN = "#58E2B2"
-AMBER = "#FFC66D"
-RED = "#FF758F"
+OUTPUT_FPS = 24
+INK = "#26362F"
+MUTED = "#747B70"
+PAPER = "#F6F4ED"
+PANEL = "#FFFEFA"
+LINE = "#E4E1D6"
+GREEN = "#526A50"
+GREEN_DARK = "#334B39"
+GREEN_SOFT = "#E5EBDD"
+CLAY = "#B9785F"
+CLAY_SOFT = "#F0E2D8"
+GOLD = "#D6A75F"
+BLUE = "#668597"
+DARK = "#101925"
+DARK_PANEL = "#182535"
+DARK_LINE = "#304052"
+WHITE = "#F7F6F0"
+MINT = "#81C7A6"
+RED = "#CA7269"
 
 SECTIONS = [
-    ("Goal and scope", "PROJECT OVERVIEW", "A synthetic-data practice project"),
-    ("CSV input and schema contract", "SOURCE CONTRACT", "Seven fields. One clear contract."),
-    ("Transform: validate and clean", "DATA TRANSFORM", "Clean valid rows. Explain rejected rows."),
-    ("Duplicate-SKU resolution", "DEDUPLICATION", "Keep the latest update, deterministically."),
-    ("SQLite load and upsert", "TARGET LOAD", "Upsert safely by SKU."),
-    ("Every row must be accounted for", "AUDIT INVARIANT", "No source row disappears."),
-    ("Release gate", "DATA QUALITY", "Check the target before release."),
-    ("Automated test coverage", "TEST STRATEGY", "Exercise normal, boundary, and failure paths."),
-    ("Commands and expected evidence", "RUN EVIDENCE", "Reconcile the run from input to target."),
-    ("Limitations and submission", "CLOSE", "Be precise about scope and evidence."),
+    (
+        "Project overview",
+        "Welcome. This project has two connected views of order data. First, a small online shop lets a customer choose products and confirm an order. Second, an ETL pipeline extracts order lines from CSV, validates and transforms them, then loads clean records into SQLite. The shop creates synthetic orders; ETL checks that they are safe to store. A generated batch also tests larger volumes and deliberate bad records. Together, these parts show both the customer journey and the data quality behind it. It is also a software testing exercise: normal paths, boundaries, and failures are checked before trusting the output. This is a local practice example, not a Fynd production integration, payment system, or official challenge solution.",
+    ),
+    (
+        "A considered storefront",
+        "The storefront offers six fixed-price products: a canvas tote, stoneware mug, cedar candle, field notebook, socks, and a botanical soap set. Product names and prices come from one shared catalog used by both the browser and Python service. Add an item and the bag count, quantity, line total, and subtotal update. Change the quantity or remove an item and the total recalculates in cents. The page has a clear empty-bag state, required name field, and helpful validation. It adapts to smaller screens and provides descriptive controls. The aim is a believable, easy-to-test shop, not a complete retail platform. Products are synthetic, prices are fixed, and the page does not collect payment details.",
+    ),
+    (
+        "Checkout and server-side trust",
+        "Checkout requires at least one product and a non-blank name. If something is missing, a message explains what to fix and preserves the cart and entered name. After submission, the page blocks repeat interaction so a rapid second click cannot create another confirmation. The browser sends product IDs, quantities, and the name to Python. The service checks each product against the shared catalog and calculates the price itself; browser-supplied prices are not trusted. It creates an order reference and synthetic guest ID, then makes one order-line record per product. Payment, accounts, delivery, and external services are deliberately out of scope.",
+    ),
+    (
+        "The order-to-confirmation path",
+        "The local service appends each new order line to a raw CSV with order ID, guest ID, customer name, SKU, quantity, unit price, order timestamp, and update timestamp. It runs the ETL pipeline, checks the SQLite table, then returns the saved order. The browser opens a separate confirmation page and retrieves the order using its reference. The page shows the customer, reference, placed time, products, quantities, line amounts, and total. The order has been extracted, validated, transformed, and loaded before confirmation appears. The service stores data locally and is a learning bridge, not a production order platform.",
+    ),
+    (
+        "ETL: extract, transform, validate",
+        "The standalone fixture contains twenty thousand and twenty synthetic rows. Its CSV contract has eight fields; column order may vary, but missing or unexpected fields fail before loading. Values are read as text, trimmed, and SKUs become uppercase. Quantities must be finite positive integers; prices must be finite and non-negative, so zero is valid. Timestamps with different offsets are normalized to UTC. Invalid rows go to a rejects CSV with one reason, such as a missing name or invalid quantity. Rejected data stays visible for investigation. The same rules process shop orders and the larger generated fixture.",
+    ),
+    (
+        "Order identity and safe loading",
+        "A SKU is not a unique order: different customers can buy the same product. The order-line key is the pair order ID plus SKU. If that same pair repeats, keep the latest update; for equal timestamps, keep the later source row. The same SKU in different orders remains separate. Browser tests verify that two mug orders both survive in SQLite. The table uses this composite primary key, and upserts only apply newer or equal updates. Existing databases with the older SKU-only key are migrated while preserving their rows. This models order lines, not product inventory.",
+    ),
+    (
+        "Accounting and release quality",
+        "Every input row is accounted for. Of twenty thousand and twenty generated rows, fifteen are rejected, five duplicate order lines are removed, and twenty thousand are loaded. Read equals rejected plus duplicates removed plus loaded. The release gate checks the SQLite schema, non-empty row count, required values, unique order-line keys, and quantity and price ranges. Quantities must stay positive and integral; prices must remain finite and non-negative. A failure exits non-zero. A clean fixture run loads twenty thousand rows and passes. Shop orders use a separate local folder, so they do not overwrite the standalone ETL example.",
+    ),
+    (
+        "Tests as evidence",
+        "Automation covers both layers. ETL tests check the source contract, normalization, rejects, timestamps, order-line keys, upserts, legacy migration, accounting, quality rules, and the CSV watcher. Chromium tests use a temporary store and a fresh cart. They verify saved confirmation details, missing-name and empty-cart validation, exact totals, removal, a rapid double-click, fixed server prices, and the same SKU across separate orders. The current suite has forty-seven passing tests: thirty-nine ETL and eight browser checks. These are automated results; manual smoke checks are documented but not claimed as run. All evidence describes this local build only.",
+    ),
+    (
+        "Putting both scales together",
+        "The complete flow is simple: browse, check out, save order lines, validate them through ETL, load SQLite, and retrieve the confirmation. A separate generated batch demonstrates larger-scale quality checks. Start the shop service and open its local address. Generate the sample CSV, run ETL and the report, or install Chromium and run pytest. The README gives the commands and the test plan explains the risks. There is no payment handling, login, production Fynd connection, or real customer data. This is an end-to-end learning project, not an ecommerce system ready for deployment. Thank you for watching.",
+    ),
+]
+
+SECTION_TITLES = [
+    "A shop, and the data behind it",
+    "Six thoughtful products",
+    "The cart stays honest",
+    "An order becomes a saved record",
+    "Extract, transform, validate",
+    "A SKU is not an order",
+    "Every row accounted for",
+    "Tests verify what customers see",
+    "One connected learning flow",
+]
+
+PRODUCTS = [
+    ("Canvas Tote", "$24.50", "bag", "#DDE6D5"),
+    ("Stoneware Mug", "$12.00", "mug", "#EFE0D4"),
+    ("Cedar Candle", "$18.50", "candle", "#EFE7D2"),
+    ("Field Notebook", "$9.50", "book", "#DCE7E8"),
+    ("Everyday Socks", "$14.00", "socks", "#EEDFDB"),
+    ("Botanical Soap", "$16.00", "soap", "#DDE9DF"),
 ]
 
 
@@ -57,329 +116,502 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-FONTS = {
-    (size, bold): font(size, bold)
-    for size in (12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 40)
-    for bold in (False, True)
-}
-
-
-def rounded(draw: ImageDraw.ImageDraw, box, fill: str, radius: int = 18, outline=None, width: int = 1):
+def rounded(draw: ImageDraw.ImageDraw, box, fill: str, radius: int = 16, outline=None, width: int = 1):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
 
-def label(draw: ImageDraw.ImageDraw, point, value: str, size: int = 19, color: str = WHITE, bold: bool = False):
-    selected = FONTS.get((size, bold), font(size, bold))
-    draw.text(point, value, font=selected, fill=color)
+def text(draw: ImageDraw.ImageDraw, point, value: str, size: int = 18, color: str = INK, bold: bool = False):
+    draw.text(point, value, font=font(size, bold), fill=color)
 
 
-def centered(draw: ImageDraw.ImageDraw, x: int, y: int, value: str, size: int = 19, color: str = WHITE, bold: bool = False):
-    selected = FONTS.get((size, bold), font(size, bold))
+def centered(draw: ImageDraw.ImageDraw, x: int, y: int, value: str, size: int = 18, color: str = INK, bold: bool = False):
+    selected = font(size, bold)
     box = draw.textbbox((0, 0), value, font=selected)
     draw.text((x - (box[2] - box[0]) / 2, y - (box[3] - box[1]) / 2), value, font=selected, fill=color)
 
 
-def arrow(draw: ImageDraw.ImageDraw, start, end, color: str = MUTED, width: int = 3):
+def wrapped(draw: ImageDraw.ImageDraw, point, value: str, width: int, size: int = 16, color: str = MUTED, line_gap: int = 7):
+    selected = font(size)
+    words = value.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if draw.textbbox((0, 0), candidate, font=selected)[2] <= width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    x, y = point
+    for line in lines:
+        draw.text((x, y), line, font=selected, fill=color)
+        y += size + line_gap
+    return y
+
+
+def arrow(draw: ImageDraw.ImageDraw, start, end, color: str = GREEN, width: int = 3):
     x1, y1 = start
     x2, y2 = end
     draw.line((x1, y1, x2, y2), fill=color, width=width)
-    draw.polygon(((x2, y2), (x2 - 11, y2 - 7), (x2 - 11, y2 + 7)), fill=color)
+    direction = 1 if x2 >= x1 else -1
+    draw.polygon(((x2, y2), (x2 - 11 * direction, y2 - 7), (x2 - 11 * direction, y2 + 7)), fill=color)
 
 
-def dot(draw: ImageDraw.ImageDraw, x: float, y: float, color: str, radius: int = 7):
+def dot(draw: ImageDraw.ImageDraw, x: float, y: float, color: str, radius: int = 6):
     draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
 
 
-def make_background() -> Image.Image:
-    image = Image.new("RGB", (W, H), BG)
+def product_icon(draw: ImageDraw.ImageDraw, kind: str, cx: int, cy: int, scale: float = 1.0, color: str = GREEN):
+    s = scale
+    stroke = max(2, round(3 * s))
+    if kind == "bag":
+        draw.arc((cx - 20 * s, cy - 25 * s, cx + 20 * s, cy + 18 * s), 180, 360, fill=color, width=stroke)
+        draw.rounded_rectangle((cx - 28 * s, cy - 8 * s, cx + 28 * s, cy + 36 * s), radius=int(7 * s), fill=color, outline=GREEN_DARK, width=stroke)
+        draw.line((cx - 14 * s, cy + 3 * s, cx + 14 * s, cy + 3 * s), fill="#F6F4ED", width=max(1, stroke - 1))
+    elif kind == "mug":
+        draw.rounded_rectangle((cx - 25 * s, cy - 22 * s, cx + 18 * s, cy + 30 * s), radius=8 * s, fill=color, outline=GREEN_DARK, width=stroke)
+        draw.arc((cx + 11 * s, cy - 10 * s, cx + 42 * s, cy + 18 * s), 270, 90, fill=GREEN_DARK, width=stroke)
+        draw.line((cx - 15 * s, cy - 8 * s, cx + 8 * s, cy - 8 * s), fill="#F6F4ED", width=stroke)
+    elif kind == "candle":
+        draw.rounded_rectangle((cx - 22 * s, cy - 7 * s, cx + 22 * s, cy + 33 * s), radius=6 * s, fill=color, outline=GREEN_DARK, width=stroke)
+        draw.line((cx, cy - 7 * s, cx, cy - 19 * s), fill=GREEN_DARK, width=stroke)
+        draw.ellipse((cx - 7 * s, cy - 35 * s, cx + 7 * s, cy - 17 * s), fill=GOLD)
+    elif kind == "book":
+        draw.rounded_rectangle((cx - 27 * s, cy - 32 * s, cx + 24 * s, cy + 33 * s), radius=4 * s, fill=color, outline=GREEN_DARK, width=stroke)
+        draw.line((cx - 16 * s, cy - 27 * s, cx - 16 * s, cy + 29 * s), fill="#F6F4ED", width=stroke)
+        for row in range(3):
+            draw.line((cx - 8 * s, cy - 8 * s + row * 10 * s, cx + 14 * s, cy - 8 * s + row * 10 * s), fill=GREEN_DARK, width=max(1, stroke - 1))
+    elif kind == "socks":
+        draw.line((cx - 15 * s, cy - 26 * s, cx - 15 * s, cy + 8 * s), fill=color, width=15 * stroke)
+        draw.line((cx - 15 * s, cy + 8 * s, cx - 32 * s, cy + 20 * s), fill=color, width=15 * stroke)
+        draw.line((cx + 16 * s, cy - 26 * s, cx + 16 * s, cy + 8 * s), fill=BLUE, width=15 * stroke)
+        draw.line((cx + 16 * s, cy + 8 * s, cx + 31 * s, cy + 20 * s), fill=BLUE, width=15 * stroke)
+    else:
+        for offset in (-15, 15):
+            draw.rounded_rectangle((cx + offset * s - 14 * s, cy - 22 * s, cx + offset * s + 14 * s, cy + 23 * s), radius=12 * s, fill=color, outline=GREEN_DARK, width=stroke)
+        draw.line((cx - 4 * s, cy - 4 * s, cx + 4 * s, cy - 4 * s), fill="#F6F4ED", width=stroke)
+
+
+def draw_pointer(draw: ImageDraw.ImageDraw, x: float, y: float, scale: float = 1.0):
+    points = [(x, y), (x, y + 23 * scale), (x + 6 * scale, y + 17 * scale), (x + 11 * scale, y + 29 * scale), (x + 16 * scale, y + 27 * scale), (x + 11 * scale, y + 15 * scale), (x + 20 * scale, y + 15 * scale)]
+    draw.polygon(points, fill=WHITE, outline=INK)
+
+
+def draw_backdrop(index: int, timestamp: float) -> Image.Image:
+    light = index in {0, 1, 2, 3, 8}
+    base = PAPER if light else DARK
+    image = Image.new("RGB", (W, H), base)
     draw = ImageDraw.Draw(image)
-    for x in range(30, W, 48):
-        draw.line((x, 0, x, H), fill=GRID, width=1)
-    for y in range(25, H, 48):
-        draw.line((0, y, W, y), fill=GRID, width=1)
-    draw.ellipse((-380, 240, 260, 880), fill="#0C1830")
-    draw.ellipse((1030, -300, 1600, 260), fill="#0C1830")
+    drift = math.sin(timestamp * 0.12) * 18
+    if light:
+        draw.ellipse((900 + drift, -380, 1510 + drift, 235), fill="#E8ECDD")
+        draw.ellipse((-380 - drift, 540, 250 - drift, 1160), fill="#F0E5D8")
+        for x in range(30, W, 72):
+            draw.line((x, 0, x, H), fill="#EFEEE7", width=1)
+    else:
+        draw.ellipse((875 + drift, -420, 1510 + drift, 225), fill="#162435")
+        draw.ellipse((-380 - drift, 490, 260 - drift, 1100), fill="#142131")
+        for x in range(30, W, 48):
+            draw.line((x, 0, x, H), fill="#162333", width=1)
+        for y in range(24, H, 48):
+            draw.line((0, y, W, y), fill="#162333", width=1)
     return image
 
 
-BACKGROUND = make_background()
+def draw_brand(draw: ImageDraw.ImageDraw, index: int, timestamp: float, total: float):
+    light = index in {0, 1, 2, 3, 8}
+    ink = INK if light else WHITE
+    secondary = MUTED if light else "#A9B6C2"
+    draw.ellipse((44, 27, 76, 59), fill=GREEN)
+    centered(draw, 60, 43, "f", 21, WHITE, True)
+    text(draw, (86, 29), "fieldnotes supply", 16, ink, True)
+    text(draw, (86, 49), "ORDER DATA, END TO END", 8, secondary, True)
+    rounded(draw, (1034, 29, 1227, 59), "#E9EEE4" if light else DARK_PANEL, 14)
+    centered(draw, 1130, 44, "LOCAL PRACTICE DEMO", 9, GREEN if light else MINT, True)
+    draw.line((44, 79, 1236, 79), fill=LINE if light else DARK_LINE, width=1)
+    draw.line((44, 694, 1236, 694), fill=LINE if light else DARK_LINE, width=1)
+    draw.line((44, 694, 44 + int(1192 * min(1.0, timestamp / max(total, 1))), 694), fill=GREEN, width=3)
+    elapsed = f"{int(timestamp // 60):02d}:{int(timestamp % 60):02d}"
+    remaining = f"{int(total // 60):02d}:{int(total % 60):02d}"
+    text(draw, (47, 703), SECTION_TITLES[index].upper(), 9, secondary, True)
+    text(draw, (1160, 703), f"{elapsed} / {remaining}", 9, secondary, True)
 
 
-def draw_header(draw: ImageDraw.ImageDraw, index: int):
-    title, chapter, _ = SECTIONS[index]
-    draw.rectangle((0, 0, W, 5), fill=CYAN)
-    label(draw, (52, 23), "F Y N D   /   DATA QUALITY", 17, CYAN, True)
-    label(draw, (52, 58), f"{index + 1:02d}   {chapter}", 14, MUTED, True)
-    label(draw, (52, 80), title, 32, WHITE, True)
-    rounded(draw, (1010, 30, 1227, 68), PANEL, 18)
-    centered(draw, 1118, 49, "SYNTHETIC DATA", 13, GREEN, True)
-    draw.line((52, 134, 1228, 134), fill="#26344F", width=2)
+def draw_overview(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 110), "A shop, and the", 47, INK, False)
+    text(draw, (57, 162), "data behind it.", 47, GREEN_DARK, True)
+    wrapped(draw, (61, 226), "One customer journey, one trustworthy order record, and one testable data pipeline.", 455, 17, MUTED, 8)
 
+    rounded(draw, (55, 334, 558, 625), PANEL, 18, LINE, 1)
+    rounded(draw, (55, 334, 558, 375), "#E8EDE2", 18)
+    draw.rectangle((55, 354, 558, 375), fill="#E8EDE2")
+    text(draw, (78, 348), "fieldnotes supply", 14, GREEN_DARK, True)
+    text(draw, (482, 350), "BAG  2", 10, GREEN_DARK, True)
+    for i, (name, price, kind, color) in enumerate(PRODUCTS[:3]):
+        x = 78 + i * 151
+        rounded(draw, (x, 396, x + 131, 571), color, 9)
+        product_icon(draw, kind, x + 65, 452, 0.72)
+        text(draw, (x + 8, 503), name, 10, INK, True)
+        text(draw, (x + 8, 521), price, 10, GREEN_DARK, True)
+        rounded(draw, (x + 8, 541, x + 122, 559), GREEN, 6)
+        centered(draw, x + 65, 550, "ADD TO BAG", 7, WHITE, True)
 
-def draw_footer(draw: ImageDraw.ImageDraw, index: int, progress: float):
-    draw.line((52, 676, 1228, 676), fill="#26344F", width=2)
-    draw.line((52, 676, 52 + int(1176 * ((index + progress) / len(SECTIONS))), 676), fill=CYAN, width=3)
-    label(draw, (52, 686), "SDET PRACTICE WALKTHROUGH", 13, MUTED, True)
-    label(draw, (1154, 686), f"{index + 1:02d} / {len(SECTIONS):02d}", 13, MUTED, True)
-
-
-def draw_pipeline(draw: ImageDraw.ImageDraw, progress: float):
-    names = [("CSV", "Synthetic orders"), ("VALIDATE", "Clean + check"), ("SQLITE", "Accepted rows"), ("REJECTS", "With reasons")]
-    xs = [70, 365, 660, 955]
-    colors = [CYAN, GREEN, CYAN, RED]
-    active = min(int(progress * len(names)), len(names) - 1)
-    for i, (name, detail) in enumerate(names):
+    rounded(draw, (688, 179, 1218, 618), DARK, 22)
+    text(draw, (722, 211), "THE SAME ORDER, AS DATA", 12, MINT, True)
+    nodes = [
+        ("SHOP", "customer"),
+        ("CSV", "order lines"),
+        ("ETL", "validate"),
+        ("SQLITE", "save"),
+    ]
+    xs = [754, 887, 1019, 1149]
+    for i, (name, detail) in enumerate(nodes):
         x = xs[i]
-        rounded(draw, (x, 280, x + 250, 435), PANEL_LIGHT if i == active else PANEL, 20, colors[i] if i == active else "#26344F", 2)
-        draw.ellipse((x + 22, 303, x + 54, 335), fill=colors[i])
-        centered(draw, x + 140, 361, name, 23, WHITE, True)
-        centered(draw, x + 140, 399, detail, 16, MUTED)
-        if i < len(names) - 1:
-            arrow(draw, (x + 258, 357), (xs[i + 1] - 12, 357))
-    for i in range(3):
-        start = xs[i] + 258
-        end = xs[i + 1] - 12
-        phase = (progress * 3 - i) % 1
-        dot(draw, start + (end - start) * phase, 357, CYAN, 5)
-    rounded(draw, (365, 505, 915, 570), "#10283A", 18, "#225169")
-    centered(draw, 640, 537, "A local practice pipeline - not a production integration", 18, CYAN, True)
+        pulse = math.sin(progress * 9 - i * 1.2) * 3
+        draw.ellipse((x - 30 - pulse, 343 - pulse, x + 30 + pulse, 403 + pulse), fill="#284338" if i <= int(progress * 4) else DARK_PANEL, outline=GREEN if i <= int(progress * 4) else DARK_LINE, width=2)
+        centered(draw, x, 372, name, 11, WHITE, True)
+        centered(draw, x, 425, detail, 9, "#A9B6C2")
+        if i < len(nodes) - 1:
+            arrow(draw, (x + 38, 373), (xs[i + 1] - 39, 373), MINT, 2)
+    rounded(draw, (723, 490, 1183, 563), "#E5EBDD", 13)
+    centered(draw, 953, 514, "CUSTOMER VIEW + DATA QUALITY", 12, GREEN_DARK, True)
+    centered(draw, 953, 541, "Connected locally. Kept deliberately synthetic.", 10, MUTED)
+
+    phase = (progress * 5) % 1
+    x = 792 + phase * 320
+    dot(draw, x, 373, GOLD, 5)
 
 
-def draw_schema(draw: ImageDraw.ImageDraw, progress: float):
-    fields = ["order_id", "customer_id", "sku", "qty", "unit_price", "order_ts", "updated_at"]
-    values = ["ORD-42", "CUS-18", "SKU-7", "2", "19.99", "10:30Z", "10:32Z"]
-    x0, y0, cw = 64, 250, 112
-    rounded(draw, (52, 218, 854, 492), PANEL, 20)
-    for i, (field, value) in enumerate(zip(fields, values)):
-        x = x0 + i * cw
-        active = i == min(int(progress * len(fields)), len(fields) - 1)
-        if active:
-            rounded(draw, (x - 3, y0 - 8, x + cw - 5, 457), "#193349", 10)
-        label(draw, (x, y0), field, 13, CYAN if active else MUTED, True)
-        draw.line((x, y0 + 34, x + cw - 12, y0 + 34), fill="#33415D", width=1)
-        label(draw, (x, y0 + 56), value, 14, WHITE)
-        label(draw, (x, y0 + 103), value, 14, WHITE)
-        label(draw, (x, y0 + 150), value, 14, WHITE)
-    label(draw, (82, 451), "CSV ROWS", 12, MUTED, True)
-    rounded(draw, (890, 218, 1228, 492), PANEL, 20)
-    label(draw, (920, 244), "CONTRACT CHECK", 16, CYAN, True)
-    checks = ["exactly 7 columns", "no missing fields", "no extra fields", "read raw values first"]
-    for i, value in enumerate(checks):
-        y = 294 + i * 44
-        dot(draw, 928, y + 9, GREEN if progress >= (i + 1) / 5 else "#3A4B67", 6)
-        label(draw, (946, y), value, 16, WHITE if progress >= (i + 1) / 5 else MUTED)
-    rounded(draw, (52, 526, 1228, 592), "#10283A", 18, "#225169")
-    centered(draw, 640, 559, "Seven required columns are checked before any row is loaded.", 18, WHITE)
+def draw_storefront(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (56, 103), "Little things for", 37, INK)
+    text(draw, (56, 144), "the everyday.", 37, GREEN_DARK, True)
+    text(draw, (898, 130), "6 PRODUCTS  /  FIXED PRICES", 10, MUTED, True)
+    rounded(draw, (54, 194, 1226, 637), PANEL, 16, LINE)
+    rounded(draw, (54, 194, 1226, 237), "#E8EDE2", 16)
+    draw.rectangle((54, 218, 1226, 237), fill="#E8EDE2")
+    text(draw, (79, 209), "FIELDNOTES SUPPLY", 11, GREEN_DARK, True)
+    text(draw, (1004, 210), "YOUR BAG", 9, MUTED, True)
+    count = min(3, max(0, int(progress * 5)))
+    rounded(draw, (1112, 203, 1184, 228), GREEN, 12)
+    centered(draw, 1148, 215, f"{count} ITEMS", 8, WHITE, True)
+
+    selected = min(5, int(progress * 6))
+    for i, (name, price, kind, color) in enumerate(PRODUCTS):
+        col, row = i % 3, i // 3
+        x, y = 78 + col * 371, 256 + row * 179
+        active = i == selected
+        bg = "#F4F2EA"
+        rounded(draw, (x, y, x + 344, y + 163), bg, 10, GREEN if active else LINE, 2 if active else 1)
+        rounded(draw, (x + 10, y + 10, x + 108, y + 103), color, 8)
+        bob = math.sin(time * 2.4 + i) * 3
+        product_icon(draw, kind, x + 59, int(y + 55 + bob), 0.72)
+        text(draw, (x + 123, y + 17), f"0{i + 1}  /  FIELDNOTES", 7, MUTED, True)
+        text(draw, (x + 123, y + 40), name, 13, INK, True)
+        text(draw, (x + 123, y + 63), price, 12, GREEN_DARK, True)
+        text(draw, (x + 123, y + 83), "Thoughtfully made.", 9, MUTED)
+        rounded(draw, (x + 10, y + 119, x + 334, y + 151), GREEN if active else "#F9F8F3", 5, GREEN if active else LINE)
+        centered(draw, x + 172, y + 135, "ADDED TO BAG  +" if active and progress > i / 6 else "ADD TO BAG  +", 9, WHITE if active else GREEN_DARK, True)
+    cursor_x = 78 + (selected % 3) * 371 + 265
+    cursor_y = 256 + (selected // 3) * 179 + 135
+    draw_pointer(draw, cursor_x + math.sin(time * 1.8) * 10, cursor_y - 28 + math.cos(time * 1.8) * 7, 0.72)
+
+    rounded(draw, (54, 651, 1226, 676), "#E6EBE0", 10)
+    centered(draw, 640, 663, "Add  /  change quantity  /  remove  /  see the exact subtotal", 10, GREEN_DARK, True)
 
 
-def draw_validation(draw: ImageDraw.ImageDraw, progress: float):
-    rounded(draw, (58, 233, 352, 505), PANEL, 20)
-    label(draw, (84, 255), "RAW CSV ROW", 15, AMBER, True)
-    label(draw, (84, 307), 'sku: " sku-104 "', 18, WHITE)
-    label(draw, (84, 350), "quantity: 2", 18, WHITE)
-    label(draw, (84, 393), "unit_price: 19.99", 18, WHITE)
-    label(draw, (84, 436), "timestamp: offset", 18, WHITE)
-    arrow(draw, (368, 366), (468, 366), CYAN, 4)
-    dot(draw, 375 + 82 * progress, 366, WHITE, 6)
-    rounded(draw, (480, 266, 780, 468), PANEL_LIGHT, 22, CYAN, 2)
-    centered(draw, 630, 306, "TRANSFORM + VALIDATE", 17, CYAN, True)
-    for i, text in enumerate(["trim + uppercase SKU", "positive whole quantity", "non-negative price", "parse timestamps as UTC"]):
-        y = 346 + i * 31
-        dot(draw, 515, y + 7, GREEN if progress > (i + 1) / 5 else MUTED, 5)
-        label(draw, (531, y), text, 14, WHITE)
-    arrow(draw, (797, 366), (870, 366), MUTED, 3)
-    rounded(draw, (890, 242, 1228, 357), "#102D2A", 18, "#267A68", 2)
-    label(draw, (916, 260), "VALID ROW", 14, GREEN, True)
-    label(draw, (916, 296), "SKU-104  |  qty 2", 17, WHITE, True)
-    rounded(draw, (890, 389, 1228, 505), "#321C2A", 18, "#79344A", 2)
-    label(draw, (916, 407), "INVALID ROW", 14, RED, True)
-    label(draw, (916, 443), "quantity: -2", 17, WHITE, True)
-    label(draw, (916, 476), "reject + reason", 14, MUTED)
-    rounded(draw, (58, 540, 1228, 594), PANEL, 16)
-    centered(draw, 643, 567, "Bad values are recorded with a clear rejection reason.", 17, MUTED)
-
-
-def draw_dedup(draw: ImageDraw.ImageDraw, progress: float):
-    label(draw, (78, 216), "EXAMPLE SKU: SKU-104", 15, CYAN, True)
-    rows = [
-        (258, "ORD-101", "SKU-104", "2026-01-07 09:00 UTC", AMBER),
-        (370, "ORD-205", "SKU-104", "2026-01-08 12:00 UTC", GREEN),
+def draw_cart(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 111), "Checkout, made clear.", 39, INK, True)
+    wrapped(draw, (61, 164), "A good checkout protects the customer's choices and the order total.", 520, 16, MUTED)
+    rounded(draw, (60, 254, 719, 627), "#E9ECDD", 20)
+    text(draw, (95, 284), "YOUR BAG", 10, GREEN, True)
+    text(draw, (95, 314), "A few good things.", 25, INK, True)
+    items = [
+        ("Canvas Tote", "1 x $24.50", "$24.50", "bag"),
+        ("Stoneware Mug", "2 x $12.00", "$24.00", "mug"),
+        ("Cedar Candle", "1 x $18.50", "$18.50", "candle"),
     ]
-    for i, (y, order, sku, updated, color) in enumerate(rows):
-        winner = i == 1
-        opacity_color = color if progress > (0.25 if i == 0 else 0.6) else "#66738A"
-        rounded(draw, (78, y, 754, y + 82), PANEL_LIGHT if winner else PANEL, 16, opacity_color if winner else "#26344F", 2)
-        label(draw, (105, y + 15), order, 16, WHITE, True)
-        label(draw, (265, y + 15), sku, 16, CYAN)
-        label(draw, (421, y + 15), "updated_at", 12, MUTED)
-        label(draw, (421, y + 42), updated, 15, WHITE)
-        if winner and progress > 0.72:
-            rounded(draw, (654, y + 20, 731, y + 59), "#164338", 15)
-            centered(draw, 692, y + 39, "KEEP", 13, GREEN, True)
-    rounded(draw, (825, 257, 1205, 345), "#30291D", 18, "#725B2E")
-    centered(draw, 1015, 281, "STABLE SORT", 16, AMBER, True)
-    centered(draw, 1015, 315, "updated_at, then source row", 15, WHITE)
-    arrow(draw, (824, 412), (934, 412), CYAN, 4)
-    rounded(draw, (953, 370, 1205, 464), "#102D2A", 18, "#267A68")
-    centered(draw, 1079, 399, "LATEST UPDATE WINS", 16, GREEN, True)
-    centered(draw, 1079, 432, "one SKU remains", 15, WHITE)
-    label(draw, (78, 510), "Equal timestamps? The later source row wins.", 17, MUTED)
-    rounded(draw, (78, 557, 1205, 603), PANEL, 14)
-    centered(draw, 642, 580, "Older duplicates are removed and included in the run accounting.", 16, WHITE)
+    for i, (name, detail, amount, kind) in enumerate(items):
+        y = 369 + i * 68
+        color = GREEN if progress > (i + 1) / 5 else LINE
+        draw.ellipse((95, y, 143, y + 48), fill="#F8F7F1")
+        product_icon(draw, kind, 119, y + 23, 0.42)
+        text(draw, (162, y + 4), name, 13, INK, True)
+        text(draw, (162, y + 27), detail, 10, MUTED)
+        text(draw, (573, y + 14), amount, 13, INK, True)
+        draw.line((95, y + 56, 680, y + 56), fill=color, width=1)
+    text(draw, (95, 594), "SUBTOTAL", 10, MUTED, True)
+    text(draw, (581, 583), "$67.00", 23, GREEN_DARK, True)
+
+    rounded(draw, (779, 193, 1222, 604), PANEL, 18, LINE)
+    text(draw, (814, 224), "MADE OUT TO", 9, MUTED, True)
+    rounded(draw, (812, 251, 1188, 296), "#FBFAF6", 6, LINE)
+    text(draw, (829, 265), "Alex Morgan", 13, INK)
+    if progress < 0.23:
+        rounded(draw, (812, 305, 1188, 345), "#FFF0ED", 6, "#EDCFC6")
+        text(draw, (826, 317), "Add your name to continue", 10, RED, True)
+    text(draw, (814, 374), "ORDER TOTAL", 9, MUTED, True)
+    text(draw, (1070, 360), "$67.00", 25, INK, True)
+    rounded(draw, (812, 425, 1188, 478), GREEN, 8)
+    centered(draw, 1000, 452, "PLACE YOUR ORDER", 11, WHITE, True)
+    text(draw, (814, 495), "One submission. One order reference.", 10, MUTED)
+    if progress > 0.45:
+        rounded(draw, (837, 521, 1172, 570), GREEN_SOFT, 7, "#C9D8C6")
+        centered(draw, 1004, 545, "SAVING ORDER  ->  CONFIRMATION", 9, GREEN_DARK, True)
+    draw_pointer(draw, 1065 + math.sin(time * 2) * 4, 431, 0.8)
 
 
-def draw_loading(draw: ImageDraw.ImageDraw, progress: float):
-    rounded(draw, (58, 268, 353, 455), PANEL, 20)
-    label(draw, (86, 290), "INCOMING ORDER", 14, MUTED, True)
-    label(draw, (86, 338), "SKU-104", 24, WHITE, True)
-    label(draw, (86, 380), "updated_at  12:00Z", 16, CYAN)
-    arrow(draw, (370, 360), (480, 360), CYAN, 4)
-    rounded(draw, (496, 254, 778, 475), PANEL_LIGHT, 22, CYAN, 2)
-    centered(draw, 637, 298, "UPSERT", 20, CYAN, True)
-    centered(draw, 637, 340, "ON CONFLICT (sku)", 15, WHITE)
-    centered(draw, 637, 374, "compare updated_at", 15, MUTED)
-    centered(draw, 637, 414, "newer or equal -> update", 14, GREEN)
-    arrow(draw, (795, 360), (876, 360), MUTED, 3)
-    rounded(draw, (894, 235, 1220, 489), PANEL, 22)
-    draw.ellipse((894, 235, 1220, 291), fill="#1B2A42", outline="#33445F", width=2)
-    draw.rectangle((894, 263, 1220, 460), fill=PANEL)
-    draw.line((894, 263, 894, 460), fill="#33445F", width=2)
-    draw.line((1220, 263, 1220, 460), fill="#33445F", width=2)
-    draw.ellipse((894, 432, 1220, 489), fill=PANEL, outline="#33445F", width=2)
-    centered(draw, 1057, 286, "ORDERS TABLE", 16, WHITE, True)
-    for i, (sku, stamp) in enumerate([("SKU-021", "09:15Z"), ("SKU-104", "12:00Z"), ("SKU-330", "10:42Z")]):
-        y = 329 + i * 43
-        selected = i == 1 and progress > 0.5
-        if selected:
-            rounded(draw, (914, y - 6, 1200, y + 29), "#153F38", 10)
-        label(draw, (930, y), sku, 15, GREEN if selected else WHITE, selected)
-        label(draw, (1112, y), stamp, 14, MUTED)
-    rounded(draw, (58, 530, 1220, 590), "#10283A", 16)
-    centered(draw, 639, 560, "SKU is the primary key; constraints protect required values.", 17, WHITE)
-
-
-def draw_accounting(draw: ImageDraw.ImageDraw, progress: float):
-    parts = [
-        (70, "ROWS READ", 20020, CYAN),
-        (365, "REJECTED", 15, RED),
-        (660, "DUPLICATES", 5, AMBER),
-        (955, "ROWS LOADED", 20000, GREEN),
+def draw_order_flow(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 111), "From click to confirmation.", 38, INK, True)
+    text(draw, (61, 159), "The customer sees the order only after it has passed through ETL.", 14, MUTED)
+    steps = [
+        ("BROWSER", "product IDs", "and quantities"),
+        ("PYTHON", "catalog price", "and validation"),
+        ("RAW CSV", "one row per", "order line"),
+        ("ETL", "clean, check", "and load"),
+        ("SQLITE", "saved facts", "by order/SKU"),
+        ("CONFIRM", "read saved", "order details"),
     ]
-    positions = [218, 335, 628, 921]
-    for i, (x, title, total, color) in enumerate(parts):
-        value = round(total * min(1.0, max(0.0, (progress * 1.35 - i * 0.1))))
-        rounded(draw, (x, 300, x + 255, 430), PANEL_LIGHT if progress > i / 4 else PANEL, 20, color, 2)
-        centered(draw, x + 127, 333, title, 15, color, True)
-        centered(draw, x + 127, 386, f"{value:,}", 32, WHITE, True)
-    centered(draw, 315, 365, "=", 31, MUTED, True)
-    centered(draw, 608, 365, "+", 31, MUTED, True)
-    centered(draw, 901, 365, "+", 31, MUTED, True)
-    rounded(draw, (149, 493, 1131, 567), "#102D2A", 18, "#267A68", 2)
-    centered(draw, 640, 530, "20,020 = 15 + 5 + 20,000", 25, GREEN, True)
-    centered(draw, 640, 602, "Rejected  +  duplicate removals  +  loaded  =  every input row", 16, MUTED)
-
-
-def draw_quality(draw: ImageDraw.ImageDraw, progress: float):
-    checks = [
-        ("TABLE", "exists + schema is correct"),
-        ("COUNT", "row count is positive"),
-        ("VALUES", "required values are present"),
-        ("UNIQUE", "SKU keys are unique"),
-        ("RANGES", "quantity + price are valid"),
-    ]
-    positions = [(66, 244), (484, 244), (902, 244), (275, 411), (693, 411)]
-    for i, ((name, detail), (x, y)) in enumerate(zip(checks, positions)):
-        passed = progress > (i + 1) / (len(checks) + 1)
-        color = GREEN if passed else "#3A4B67"
-        rounded(draw, (x, y, x + 312, y + 122), PANEL_LIGHT if passed else PANEL, 18, color, 2)
-        dot(draw, x + 30, y + 35, color, 9)
-        label(draw, (x + 54, y + 18), name, 15, CYAN if passed else MUTED, True)
-        label(draw, (x + 22, y + 66), detail, 15, WHITE)
-        if passed:
-            centered(draw, x + 275, y + 35, "PASS", 13, GREEN, True)
-    rounded(draw, (260, 577, 1020, 619), "#102D2A", 16, "#267A68")
-    centered(draw, 640, 598, "Any failed check blocks release with a non-zero exit.", 15, GREEN, True)
-
-
-def draw_tests(draw: ImageDraw.ImageDraw, progress: float):
-    rounded(draw, (65, 228, 496, 512), "#101725", 20, "#31405A", 2)
-    rounded(draw, (65, 228, 496, 273), "#1C2940", 18)
-    for i, color in enumerate([RED, AMBER, GREEN]):
-        dot(draw, 91 + i * 25, 251, color, 6)
-    label(draw, (91, 299), "python -m pytest -q", 18, CYAN, True)
-    for i in range(5):
-        y = 354 + i * 28
-        label(draw, (93, y), f"test_{i + 1:02d}", 14, MUTED)
-        if progress > (i + 1) / 6:
-            label(draw, (360, y), "PASS", 13, GREEN, True)
-    rounded(draw, (91, 490, 466, 535), "#102D2A", 14)
-    centered(draw, 278, 512, "36 tests passed", 16, GREEN, True)
-    cards = [
-        ("CONTRACT", "missing / extra columns"),
-        ("BOUNDARIES", "zero price, quantity one"),
-        ("NEGATIVE", "bad values + timestamps"),
-        ("BEHAVIOUR", "duplicates, upsert, release"),
-    ]
-    for i, (title, detail) in enumerate(cards):
-        x = 550 + (i % 2) * 339
-        y = 237 + (i // 2) * 143
-        passed = progress > (i + 1) / 5
-        rounded(draw, (x, y, x + 310, y + 117), PANEL_LIGHT if passed else PANEL, 18, GREEN if passed else "#26344F", 2)
-        label(draw, (x + 20, y + 18), title, 14, CYAN, True)
-        label(draw, (x + 20, y + 53), detail, 15, WHITE)
-        if passed:
-            dot(draw, x + 278, y + 84, GREEN, 7)
-    centered(draw, 890, 554, "Positive + boundary + negative coverage", 16, MUTED)
-
-
-def draw_evidence(draw: ImageDraw.ImageDraw, progress: float):
-    metrics = [
-        ("ROWS READ", 20020, CYAN),
-        ("REJECTED", 15, RED),
-        ("DUPLICATES", 5, AMBER),
-        ("LOADED", 20000, GREEN),
-    ]
-    for i, (name, total, color) in enumerate(metrics):
-        x = 62 + i * 296
-        value = round(total * min(1.0, progress * 1.8))
-        rounded(draw, (x, 252, x + 264, 385), PANEL, 20, color, 2)
-        label(draw, (x + 22, 274), name, 14, color, True)
-        label(draw, (x + 22, 317), f"{value:,}", 32, WHITE, True)
-        label(draw, (x + 22, 359), "documented sample run", 13, MUTED)
-    rounded(draw, (90, 445, 1190, 525), "#101725", 18, "#31405A", 2)
-    label(draw, (118, 469), "python -m src.etl_pipeline ...", 16, CYAN, True)
-    label(draw, (738, 469), "JUnit report  +  release gate", 16, MUTED)
-    rounded(draw, (429, 557, 851, 609), "#102D2A", 17, "#267A68", 2)
-    centered(draw, 640, 583, "RUN RECONCILED  /  QUALITY GATE PASS", 16, GREEN, True)
-
-
-def draw_close(draw: ImageDraw.ImageDraw, progress: float):
-    centered(draw, 640, 202, "Clear evidence. Honest boundaries.", 27, WHITE, True)
-    cards = [
-        (76, "PRACTICE ONLY", "No production integration", CYAN),
-        (463, "SYNTHETIC DATA", "No real customer records", GREEN),
-        (850, "ADAPT TO BRIEF", "Use the registered track", AMBER),
-    ]
-    for x, title, detail, color in cards:
-        rounded(draw, (x, 267, x + 350, 412), PANEL, 20, color, 2)
-        dot(draw, x + 32, 305, color, 10)
-        label(draw, (x + 56, 287), title, 16, color, True)
-        label(draw, (x + 24, 347), detail, 16, WHITE)
-    steps = ["TEST", "DOCUMENT", "REVIEW", "SUBMIT"]
-    for i, step in enumerate(steps):
-        x = 155 + i * 260
-        color = GREEN if progress > (i + 1) / 5 else "#52617A"
-        rounded(draw, (x, 491, x + 174, 548), PANEL_LIGHT, 16, color, 2)
-        centered(draw, x + 87, 520, step, 14, WHITE if color == GREEN else MUTED, True)
+    x_starts = [52, 256, 460, 664, 868, 1072]
+    cy = 355
+    for i, (title, line1, line2) in enumerate(steps):
+        x = x_starts[i]
+        active = progress > i / 6
+        draw.ellipse((x + 31, cy - 43, x + 107, cy + 33), fill=GREEN_SOFT if active else PANEL, outline=GREEN if active else LINE, width=3)
+        if i == 0:
+            rounded(draw, (x + 49, cy - 27, x + 90, cy + 18), GREEN if active else MUTED, 4)
+            draw.line((x + 56, cy - 16, x + 83, cy - 16), fill=PANEL, width=2)
+            draw.line((x + 56, cy - 7, x + 83, cy - 7), fill=PANEL, width=2)
+        elif i == 1:
+            centered(draw, x + 69, cy - 4, "PY", 17, GREEN_DARK if active else MUTED, True)
+        elif i == 2:
+            draw.polygon(((x + 50, cy - 24), (x + 84, cy - 24), (x + 93, cy - 14), (x + 93, cy + 20), (x + 50, cy + 20)), fill=PANEL, outline=GREEN if active else MUTED)
+            for row in range(3):
+                draw.line((x + 57, cy - 10 + row * 9, x + 84, cy - 10 + row * 9), fill=GREEN if active else MUTED, width=2)
+        elif i == 3:
+            centered(draw, x + 69, cy - 4, "ETL", 13, GREEN_DARK if active else MUTED, True)
+        elif i == 4:
+            draw.ellipse((x + 50, cy - 24, x + 94, cy - 8), fill=GREEN if active else MUTED)
+            draw.rectangle((x + 50, cy - 16, x + 94, cy + 16), fill=GREEN if active else MUTED)
+            draw.arc((x + 50, cy + 8, x + 94, cy + 25), 0, 180, fill=GREEN_DARK, width=2)
+        else:
+            centered(draw, x + 69, cy - 3, "OK", 15, GREEN_DARK if active else MUTED, True)
+        centered(draw, x + 69, cy + 67, title, 10, GREEN_DARK if active else MUTED, True)
+        centered(draw, x + 69, cy + 91, line1, 9, MUTED)
+        centered(draw, x + 69, cy + 106, line2, 9, MUTED)
         if i < len(steps) - 1:
-            arrow(draw, (x + 184, 520), (x + 247, 520), MUTED, 2)
-    rounded(draw, (222, 582, 1058, 623), "#10283A", 15)
-    centered(draw, 640, 602, "Review the video and verify the evidence before sharing.", 15, CYAN)
+            arrow(draw, (x + 111, cy - 4), (x_starts[i + 1] + 25, cy - 4), GREEN if active else "#B9BDB2", 2)
+    path = (progress * 6) % 1
+    x = 161 + path * 856
+    dot(draw, x, cy - 4 + math.sin(time * 3) * 2, CLAY, 7)
+    rounded(draw, (150, 560, 1130, 624), "#EBEEE5", 12)
+    centered(draw, 640, 581, "Local API  ->  store_orders.csv  ->  ETL  ->  store_orders.sqlite", 13, GREEN_DARK, True)
+    centered(draw, 640, 604, "Confirmation details are retrieved from the saved order, not browser-only state.", 10, MUTED)
 
 
-SCENE_DRAWERS = [
-    draw_pipeline, draw_schema, draw_validation, draw_dedup, draw_loading,
-    draw_accounting, draw_quality, draw_tests, draw_evidence, draw_close,
+def draw_transform(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 110), "Clean the record.", 41, WHITE, True)
+    text(draw, (59, 162), "Keep the evidence.", 41, MINT)
+    text(draw, (60, 220), "Eight fields enter. Every value gets a clear decision.", 14, "#A9B6C2")
+
+    rounded(draw, (52, 280, 492, 626), DARK_PANEL, 16, DARK_LINE)
+    text(draw, (78, 301), "SOURCE CSV", 10, MINT, True)
+    headers = ["order_id", "customer_id", "customer_name", "sku", "quantity", "unit_price", "order_timestamp", "updated_at"]
+    row_a = ["ORD-42", "GUEST-81", "Alex Morgan", " tote-01 ", "2", "24.50", "10:30-04:00", "10:32-04:00"]
+    row_b = ["ORD-43", "GUEST-98", "", "MUG-02", "-1", "12.00", "not-a-time", "10:35Z"]
+    for i, (head, value_a, value_b) in enumerate(zip(headers, row_a, row_b)):
+        y = 331 + i * 33
+        text(draw, (78, y), head, 9, "#9BAAB6", True)
+        text(draw, (245, y), value_a, 9, WHITE)
+        if progress > 0.48:
+            text(draw, (375, y), value_b, 9, RED if i in {1, 3, 5} else "#BAC2C8")
+    text(draw, (78, 602), "RAW VALUES FIRST", 8, "#82919F", True)
+
+    rounded(draw, (531, 310, 839, 561), "#E8EDE2", 18)
+    centered(draw, 685, 342, "VALIDATE + TRANSFORM", 13, GREEN_DARK, True)
+    validations = ["trim text / uppercase SKU", "positive whole quantity", "finite, non-negative price", "parse timestamps as UTC", "record one reject reason"]
+    for i, value in enumerate(validations):
+        y = 380 + i * 31
+        active = progress > (i + 1) / 7
+        dot(draw, 567, y + 6, GREEN if active else "#B9C1B5", 5)
+        text(draw, (583, y), value, 10, GREEN_DARK if active else MUTED, active)
+
+    arrow(draw, (846, 431), (902, 431), MINT, 3)
+    rounded(draw, (921, 291, 1228, 418), "#183C32", 15, "#3D8B68", 2)
+    text(draw, (945, 313), "ACCEPTED", 9, MINT, True)
+    text(draw, (945, 350), "TOTE-01  /  quantity 2", 11, WHITE, True)
+    text(draw, (945, 380), "timestamp normalized to UTC", 9, "#B8D3C4")
+    rounded(draw, (921, 440, 1228, 567), "#3B282B", 15, "#805051", 2)
+    text(draw, (945, 461), "REJECTED", 9, "#F2A7A0", True)
+    text(draw, (945, 495), "ORD-43  /  quantity -1", 11, WHITE, True)
+    text(draw, (945, 526), "reason: invalid_quantity", 9, "#E4B8B4")
+    rounded(draw, (52, 644, 1228, 676), "#1C2A36", 8)
+    centered(draw, 640, 660, "Rejects stay visible in a separate CSV for follow-up.", 10, "#CFD6D8")
+
+
+def draw_identity(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 109), "A product is not an order.", 39, WHITE, True)
+    text(draw, (60, 159), "Order identity comes from the pair:  order_id  +  sku", 15, MINT)
+    left = (75, 235, 595, 475)
+    right = (683, 235, 1205, 475)
+    rounded(draw, left, DARK_PANEL, 18, DARK_LINE)
+    rounded(draw, right, DARK_PANEL, 18, DARK_LINE)
+    text(draw, (106, 259), "SAME SKU, DIFFERENT ORDERS", 10, "#AAB7C2", True)
+    text(draw, (714, 259), "SAME ORDER + SKU, NEWER UPDATE", 10, "#AAB7C2", True)
+
+    records = [
+        (305, "ORD-1001", "MUG-02", "Customer A", MINT),
+        (393, "ORD-1002", "MUG-02", "Customer B", GOLD),
+    ]
+    for y, order, sku, customer, color in records:
+        rounded(draw, (105, y, 564, y + 61), "#1E3041", 9, color if progress > 0.35 else DARK_LINE, 2)
+        text(draw, (125, y + 11), order, 11, WHITE, True)
+        text(draw, (280, y + 11), sku, 11, MINT, True)
+        text(draw, (397, y + 12), customer, 9, "#B7C0C5")
+        if progress > 0.53:
+            centered(draw, 530, y + 42, "KEEP BOTH", 7, color, True)
+
+    rounded(draw, (715, 307, 1166, 373), "#3B2E2B", 9, "#9C6955", 2)
+    text(draw, (737, 323), "ORD-2040    TOTE-01", 11, WHITE)
+    text(draw, (1005, 323), "09:00", 10, "#E2B29A")
+    rounded(draw, (715, 395, 1166, 461), "#1E3C34", 9, MINT if progress > 0.65 else DARK_LINE, 2)
+    text(draw, (737, 410), "ORD-2040    TOTE-01", 11, WHITE, True)
+    text(draw, (1005, 410), "10:15", 10, MINT, True)
+    if progress > 0.68:
+        rounded(draw, (1072, 426, 1148, 449), "#2D5143", 8)
+        centered(draw, 1110, 438, "LATEST", 7, MINT, True)
+    arrow(draw, (836, 382), (836, 390), GOLD, 2)
+
+    rounded(draw, (121, 522, 1158, 623), "#E8EDE2", 14)
+    text(draw, (153, 543), "SQLITE COMPOSITE PRIMARY KEY", 9, GREEN_DARK, True)
+    text(draw, (153, 572), "PRIMARY KEY  (order_id, sku)", 20, INK, True)
+    text(draw, (704, 548), "Same key? Latest update wins.", 11, GREEN_DARK, True)
+    text(draw, (704, 575), "Different order? Preserve both.", 11, GREEN_DARK)
+    pulse_x = 153 + (progress * 850) % 850
+    draw.ellipse((pulse_x, 609, pulse_x + 7, 616), fill=CLAY)
+
+
+def draw_quality(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 107), "No row disappears.", 38, INK, True)
+    text(draw, (60, 155), "The accounting invariant makes the batch auditable.", 14, MUTED)
+    equation = [("READ", 20020, BLUE), ("REJECTED", 15, RED), ("DUPLICATES", 5, GOLD), ("LOADED", 20000, GREEN)]
+    x_positions = [54, 355, 656, 957]
+    for i, ((title, value, color), x) in enumerate(zip(equation, x_positions)):
+        count = round(value * min(1, max(0, progress * 1.6 - i * 0.09)))
+        rounded(draw, (x, 228, x + 265, 348), PANEL, 16, color, 2)
+        centered(draw, x + 132, 259, title, 10, color, True)
+        centered(draw, x + 132, 306, f"{count:,}", 28, INK, True)
+        if i < 3:
+            centered(draw, x + 284, 289, "=" if i == 0 else "+", 25, MUTED, True)
+    rounded(draw, (204, 379, 1076, 449), "#E8EDE2", 13)
+    centered(draw, 640, 414, "20,020  =  15  +  5  +  20,000", 23, GREEN_DARK, True)
+
+    text(draw, (59, 491), "RELEASE GATE", 9, GREEN_DARK, True)
+    checks = [
+        ("Schema", "required columns"),
+        ("Rows", "non-empty target"),
+        ("Values", "no blanks"),
+        ("Keys", "unique order / SKU"),
+        ("Ranges", "quantity + price"),
+    ]
+    for i, (name, detail) in enumerate(checks):
+        x = 58 + i * 238
+        passed = progress > 0.38 + i * 0.095
+        rounded(draw, (x, 520, x + 212, 605), GREEN_SOFT if passed else "#F0EEE6", 11, "#C9D8C6" if passed else LINE, 1)
+        dot(draw, x + 23, 545, GREEN if passed else "#B9BDB2", 6)
+        text(draw, (x + 38, 536), name, 11, GREEN_DARK if passed else MUTED, True)
+        text(draw, (x + 17, 570), detail, 9, MUTED)
+        if passed:
+            centered(draw, x + 184, 544, "PASS", 7, GREEN, True)
+    rounded(draw, (333, 622, 947, 660), DARK, 10)
+    centered(draw, 640, 641, "FAILURES EXIT NON-ZERO  /  QUALITY GATE PASS", 10, MINT, True)
+
+
+def draw_tests(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (57, 109), "Evidence, not guesswork.", 39, WHITE, True)
+    text(draw, (60, 158), "The checks follow customer-visible outcomes and data contracts.", 14, "#A9B6C2")
+    rounded(draw, (60, 224, 615, 619), DARK_PANEL, 18, DARK_LINE, 1)
+    text(draw, (92, 250), "PYTEST  /  CHROMIUM", 10, MINT, True)
+    checks = [
+        "ETL source contract + validation",
+        "Composite key + migration",
+        "Store order saved to SQLite",
+        "Missing name + empty bag",
+        "Exact total + item removal",
+        "Fixed price + rapid repeat",
+        "Same SKU, separate orders",
+    ]
+    for i, item in enumerate(checks):
+        y = 291 + i * 38
+        current = min(len(checks) - 1, int(progress * len(checks)))
+        color = MINT if i <= current else "#7B8996"
+        if i <= current:
+            draw.ellipse((94, y + 3, 108, y + 17), fill=color)
+            draw.line((98, y + 9, 101, y + 12), fill=DARK, width=2)
+            draw.line((101, y + 12, 105, y + 6), fill=DARK, width=2)
+        else:
+            draw.ellipse((94, y + 3, 108, y + 17), outline="#596979", width=1)
+        text(draw, (121, y), item, 11, WHITE if i <= current else "#8996A1")
+
+    rounded(draw, (650, 224, 1224, 619), "#F1EFE7", 18)
+    text(draw, (685, 250), "CURRENT RUN", 9, GREEN, True)
+    text(draw, (685, 283), "47", 60, INK, True)
+    text(draw, (778, 316), "tests passed", 15, GREEN_DARK, True)
+    draw.line((686, 364, 1188, 364), fill=LINE, width=2)
+    text(draw, (687, 390), "39", 28, GREEN_DARK, True)
+    text(draw, (735, 402), "ETL checks", 10, MUTED)
+    text(draw, (948, 390), "8", 28, GREEN_DARK, True)
+    text(draw, (984, 402), "browser journeys", 10, MUTED)
+    rounded(draw, (686, 454, 1188, 509), "#E5EBDD", 9)
+    centered(draw, 937, 481, "TEMPORARY TEST DATA  /  CLEAN BROWSER CONTEXTS", 9, GREEN_DARK, True)
+    wrapped(draw, (687, 535), "Automated outcomes are reported. Manual smoke checks stay clearly labelled as not run.", 470, 10, MUTED, 5)
+
+
+def draw_wrap(draw: ImageDraw.ImageDraw, progress: float, time: float):
+    text(draw, (60, 110), "One connected", 46, INK)
+    text(draw, (60, 162), "learning flow.", 46, GREEN_DARK, True)
+    wrapped(draw, (63, 232), "A thoughtful storefront creates an order. A careful ETL pipeline makes that order trustworthy and easy to verify.", 525, 18, MUTED, 9)
+
+    flow = [
+        ("SHOP", "six products"),
+        ("CHECKOUT", "fixed prices"),
+        ("CSV", "order lines"),
+        ("ETL", "quality checks"),
+        ("SQLITE", "saved order"),
+        ("DETAILS", "confirmation"),
+    ]
+    xs = [91, 307, 523, 739, 955, 1171]
+    for i, (title, detail) in enumerate(flow):
+        x = xs[i]
+        active = progress > i / 6
+        draw.ellipse((x - 37, 413 - 37, x + 37, 413 + 37), fill=GREEN if active else "#E8E7DE", outline=GREEN if active else "#C8C9BF", width=2)
+        centered(draw, x, 413, title, 9, WHITE if active else MUTED, True)
+        centered(draw, x, 468, detail, 8, MUTED)
+        if i < len(flow) - 1:
+            arrow(draw, (x + 43, 413), (xs[i + 1] - 46, 413), GREEN if active else "#B9BDB2", 2)
+    particle_x = 91 + (progress * 5 % 1) * 1080
+    dot(draw, particle_x, 413, CLAY, 6)
+
+    rounded(draw, (610, 535, 1219, 627), "#E8EDE2", 14)
+    text(draw, (639, 553), "LOCAL PRACTICE PROJECT", 9, GREEN_DARK, True)
+    text(draw, (639, 578), "Synthetic records. No payments. No Fynd production link.", 10, INK)
+    text(draw, (639, 602), "Reproduce it with the README and test plan.", 9, MUTED)
+    text(draw, (61, 551), "PROJECT GOAL", 9, CLAY, True)
+    wrapped(draw, (61, 575), "Clear customer feedback; traceable data quality.", 470, 13, INK, 5)
+
+
+DRAWERS = [
+    draw_overview,
+    draw_storefront,
+    draw_cart,
+    draw_order_flow,
+    draw_transform,
+    draw_identity,
+    draw_quality,
+    draw_tests,
+    draw_wrap,
 ]
 
 
@@ -390,74 +622,113 @@ def probe_duration(path: Path) -> float:
         text=True,
         check=False,
     )
+    import re
+
     match = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", result.stderr)
     if not match:
-        raise RuntimeError(f"Could not read video duration for {path}: {result.stderr}")
+        raise RuntimeError(f"Could not read media duration for {path}: {result.stderr}")
     hours, minutes, seconds = match.groups()
     return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
-def scene_boundaries(path: Path) -> list[float]:
-    result = subprocess.run(
+async def synthesize_narration(directory: Path) -> tuple[Path, list[float]]:
+    pieces: list[Path] = []
+    durations: list[float] = []
+    for index, (title, narration) in enumerate(SECTIONS):
+        piece = directory / f"narration-{index:02d}.mp3"
+        print(f"Synthesizing narration {index + 1}/{len(SECTIONS)}: {title}", flush=True)
+        for attempt in range(3):
+            try:
+                await edge_tts.Communicate(narration, VOICE, rate=VOICE_RATE).save(str(piece))
+                break
+            except NoAudioReceived as error:
+                if attempt == 2:
+                    raise RuntimeError(f"No narration audio received for scene {title!r}") from error
+                await asyncio.sleep(2 ** attempt)
+        pieces.append(piece)
+        durations.append(probe_duration(piece))
+        await asyncio.sleep(0.5)
+
+    joined = directory / "narration.mp3"
+    inputs = []
+    for piece in pieces:
+        inputs.extend(["-i", str(piece)])
+    streams = "".join(f"[{index}:a:0]" for index in range(len(pieces)))
+    filter_graph = f"{streams}concat=n={len(pieces)}:v=0:a=1[out]"
+    subprocess.run(
         [
-            FFMPEG, "-v", "error", "-i", str(path),
-            "-vf", "fps=1,scale=64:36,format=rgb24",
-            "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+            FFMPEG,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            *inputs,
+            "-filter_complex",
+            filter_graph,
+            "-map",
+            "[out]",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            str(joined),
         ],
-        capture_output=True,
         check=True,
     )
-    frame_size = 64 * 36 * 3
-    frame_count = len(result.stdout) // frame_size
-    if frame_count < 2:
-        raise RuntimeError(f"No usable video frames found in {path}")
-
-    frames = [
-        Image.frombytes("RGB", (64, 36), result.stdout[offset:offset + frame_size])
-        for offset in range(0, frame_count * frame_size, frame_size)
-    ]
-    boundaries = []
-    for second, (previous, current) in enumerate(zip(frames, frames[1:]), start=1):
-        difference = ImageChops.difference(previous, current)
-        delta = sum(ImageStat.Stat(difference).mean) / 3
-        if delta > 1:
-            boundaries.append(float(second))
-
-    expected = len(SECTIONS) - 1
-    if len(boundaries) != expected:
-        raise RuntimeError(
-            f"Expected {expected} narration scene changes, found {len(boundaries)}. "
-            "Check that the source video still has its original section slides."
-        )
-    return boundaries
+    return joined, durations
 
 
 def render_video(silent_video: Path, duration: float, starts: list[float]) -> None:
     command = [
-        FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "rawvideo", "-pixel_format", "rgb24",
-        "-video_size", f"{W}x{H}", "-framerate", str(FPS), "-i", "-",
-        "-an", "-r", str(VIDEO_FPS), "-c:v", "libx264",
-        "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+        FFMPEG,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pixel_format",
+        "rgb24",
+        "-video_size",
+        f"{W}x{H}",
+        "-framerate",
+        str(FPS),
+        "-i",
+        "-",
+        "-an",
+        "-r",
+        str(OUTPUT_FPS),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "19",
+        "-pix_fmt",
+        "yuv420p",
         str(silent_video),
     ]
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     section_starts = [0.0, *starts]
     section_ends = [*starts, duration]
     frame_count = round(duration * FPS)
+    previous_frame: Image.Image | None = None
     try:
         for frame_number in range(frame_count):
             timestamp = frame_number / FPS
             index = bisect.bisect_right(section_starts, timestamp) - 1
-            index = min(index, len(SECTIONS) - 1)
-            section_duration = section_ends[index] - section_starts[index]
-            progress = (timestamp - section_starts[index]) / section_duration
-            frame = BACKGROUND.copy()
+            index = min(index, len(DRAWERS) - 1)
+            section_duration = max(0.1, section_ends[index] - section_starts[index])
+            progress = min(1.0, max(0.0, (timestamp - section_starts[index]) / section_duration))
+            frame = draw_backdrop(index, timestamp)
             draw = ImageDraw.Draw(frame)
-            draw_header(draw, index)
-            SCENE_DRAWERS[index](draw, min(1.0, max(0.0, progress)))
-            draw_footer(draw, index, min(1.0, max(0.0, progress)))
+            DRAWERS[index](draw, progress, timestamp)
+            draw_brand(draw, index, timestamp, duration)
+            if previous_frame is not None and timestamp - section_starts[index] < 0.8:
+                alpha = min(1.0, (timestamp - section_starts[index]) / 0.8)
+                frame = Image.blend(previous_frame, frame, alpha)
             process.stdin.write(frame.tobytes())
+            previous_frame = frame
         process.stdin.close()
         error = process.stderr.read()
         return_code = process.wait()
@@ -466,34 +737,69 @@ def render_video(silent_video: Path, duration: float, starts: list[float]) -> No
         process.wait()
         raise
     if return_code:
-        raise RuntimeError(f"FFmpeg could not render the animated video: {error.decode(errors='replace')}")
+        raise RuntimeError(f"FFmpeg could not render the animation: {error.decode(errors='replace')}")
 
 
 def main() -> None:
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"Source walkthrough not found: {SOURCE}")
-    duration = probe_duration(SOURCE)
-    starts = scene_boundaries(SOURCE)
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    if len(SECTIONS) != len(DRAWERS) or len(SECTIONS) != len(SECTION_TITLES):
+        raise RuntimeError("Each narration section must have a matching visual scene.")
 
-    with tempfile.TemporaryDirectory(prefix="walkthrough-") as temp_dir:
-        silent_video = Path(temp_dir) / "animated-silent.mp4"
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="fieldnotes-walkthrough-") as temp_name:
+        temp_directory = Path(temp_name)
+        narration, section_durations = asyncio.run(synthesize_narration(temp_directory))
+        duration = probe_duration(narration)
+        if not 420 <= duration <= 480:
+            total_words = sum(len(script.split()) for _, script in SECTIONS)
+            raise RuntimeError(
+                f"Narration is {duration / 60:.2f} minutes, outside the 7-8 minute target "
+                f"({total_words} words at {VOICE_RATE}). Adjust the script or TTS rate."
+            )
+        starts = []
+        cursor = 0.0
+        for segment_duration in section_durations[:-1]:
+            cursor += segment_duration
+            starts.append(cursor)
+
+        silent_video = temp_directory / "animated-silent.mp4"
+        rendered_video = temp_directory / "overview-final.mp4"
         render_video(silent_video, duration, starts)
         subprocess.run(
             [
-                FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-                "-i", str(silent_video), "-i", str(SOURCE),
-                "-map", "0:v:0", "-map", "1:a:0",
-                "-c:v", "copy", "-c:a", "copy",
-                "-t", f"{duration:.3f}", "-movflags", "+faststart",
-                str(OUTPUT),
+                FFMPEG,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(silent_video),
+                "-i",
+                str(narration),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-t",
+                f"{duration:.3f}",
+                "-movflags",
+                "+faststart",
+                str(rendered_video),
             ],
             check=True,
         )
+        rendered_video.replace(OUTPUT)
 
+    words = sum(len(script.split()) for _, script in SECTIONS)
     print(f"Created: {OUTPUT}")
-    print(f"Duration: {duration:.2f} seconds; narration preserved from source.")
-    print("Scene starts: " + ", ".join(f"{start:.0f}s" for start in starts))
+    print(f"Duration: {duration / 60:.2f} minutes ({duration:.1f} seconds)")
+    print(f"Narration: {VOICE} male Indian-English neural voice; {words} words.")
+    print("Visuals: nine animated scenes following the storefront, order API, ETL, SQLite, and tests.")
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import argparse
 import re
 import sqlite3
 import time
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pandas as pd
 ORDER_COLUMNS = (
     "order_id",
     "customer_id",
+    "customer_name",
     "sku",
     "quantity",
     "unit_price",
@@ -65,7 +67,16 @@ def _transform(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, int]:
         eligible = reasons.eq("")
         reasons.loc[eligible & mask] = reason
 
-    for column in ("order_id", "customer_id", "sku", "quantity", "unit_price", "order_timestamp", "updated_at"):
+    for column in (
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "sku",
+        "quantity",
+        "unit_price",
+        "order_timestamp",
+        "updated_at",
+    ):
         reject_where(data[column].eq(""), f"missing_{column}")
 
     quantity = pd.to_numeric(data["quantity"], errors="coerce")
@@ -99,10 +110,10 @@ def _transform(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     valid["order_timestamp"] = order_time.loc[~rejected_mask].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     valid["_updated_sort"] = update_time.loc[~rejected_mask]
 
-    duplicate_count = len(valid) - valid["sku"].nunique()
+    duplicate_count = len(valid) - len(valid.drop_duplicates(subset=["order_id", "sku"]))
     # Stable sorting makes the later source row win when timestamps are equal.
     valid = valid.sort_values(["_updated_sort", "source_row"], kind="mergesort")
-    valid = valid.drop_duplicates(subset=["sku"], keep="last")
+    valid = valid.drop_duplicates(subset=["order_id", "sku"], keep="last")
     valid["updated_at"] = valid["_updated_sort"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     valid = valid.loc[:, ORDER_COLUMNS]
     return valid, rejected, duplicate_count
@@ -116,28 +127,56 @@ def _validate_table_name(table_name: str) -> None:
 def _load(database: Path, table_name: str, rows: pd.DataFrame) -> None:
     _validate_table_name(table_name)
     with sqlite3.connect(database) as connection:
-        connection.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS "{table_name}" (
-                sku TEXT PRIMARY KEY,
-                order_id TEXT NOT NULL,
-                customer_id TEXT NOT NULL,
-                quantity INTEGER NOT NULL CHECK (quantity > 0),
-                unit_price REAL NOT NULL CHECK (unit_price >= 0),
-                order_timestamp TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
+        existing = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table_name,)
+        ).fetchone()
+        if existing:
+            columns = {
+                row[1] for row in connection.execute(f'PRAGMA table_info("{table_name}")')
+            }
+            primary_key = [
+                row[1]
+                for row in sorted(
+                    (row for row in connection.execute(f'PRAGMA table_info("{table_name}")') if row[5]),
+                    key=lambda row: row[5],
+                )
+            ]
+            expected = set(ORDER_COLUMNS) - {"customer_name"}
+            if not expected.issubset(columns):
+                raise ValueError(
+                    f"Existing table {table_name!r} is missing required columns: "
+                    + ", ".join(sorted(expected - columns))
+                )
+            if primary_key != ["order_id", "sku"] or "customer_name" not in columns:
+                legacy_name = f"{table_name}_legacy_{uuid.uuid4().hex}"
+                connection.execute(f'ALTER TABLE "{table_name}" RENAME TO "{legacy_name}"')
+                _create_orders_table(connection, table_name)
+                customer_name = (
+                    "customer_name" if "customer_name" in columns else "customer_id"
+                )
+                connection.execute(
+                    f"""
+                    INSERT INTO "{table_name}"
+                        (order_id, customer_id, customer_name, sku, quantity, unit_price,
+                         order_timestamp, updated_at)
+                    SELECT order_id, customer_id, {customer_name}, sku, quantity, unit_price,
+                           order_timestamp, updated_at
+                    FROM "{legacy_name}"
+                    """
+                )
+                connection.execute(f'DROP TABLE "{legacy_name}"')
+        else:
+            _create_orders_table(connection, table_name)
+
         values = [tuple(row) for row in rows.loc[:, ORDER_COLUMNS].itertuples(index=False, name=None)]
         connection.executemany(
             f"""
             INSERT INTO "{table_name}"
-                (order_id, customer_id, sku, quantity, unit_price, order_timestamp, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(sku) DO UPDATE SET
-                order_id = excluded.order_id,
+                (order_id, customer_id, customer_name, sku, quantity, unit_price, order_timestamp, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(order_id, sku) DO UPDATE SET
                 customer_id = excluded.customer_id,
+                customer_name = excluded.customer_name,
                 quantity = excluded.quantity,
                 unit_price = excluded.unit_price,
                 order_timestamp = excluded.order_timestamp,
@@ -148,13 +187,31 @@ def _load(database: Path, table_name: str, rows: pd.DataFrame) -> None:
         )
 
 
+def _create_orders_table(connection: sqlite3.Connection, table_name: str) -> None:
+    connection.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS "{table_name}" (
+            order_id TEXT NOT NULL,
+            customer_id TEXT NOT NULL,
+            customer_name TEXT NOT NULL,
+            sku TEXT NOT NULL,
+            quantity INTEGER NOT NULL CHECK (quantity > 0),
+            unit_price REAL NOT NULL CHECK (unit_price >= 0),
+            order_timestamp TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (order_id, sku)
+        )
+        """
+    )
+
+
 def run_pipeline(
     input_csv: str | Path,
     database: str | Path,
     rejects_csv: str | Path,
     table_name: str = "orders",
 ) -> PipelineResult:
-    """Load a CSV, writing one reason per rejected row and upserting by SKU."""
+    """Load CSV order lines, rejecting invalid rows and upserting by order ID and SKU."""
     input_path = Path(input_csv)
     database_path = Path(database)
     rejects_path = Path(rejects_csv)

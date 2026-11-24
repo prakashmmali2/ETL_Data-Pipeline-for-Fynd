@@ -27,10 +27,11 @@ integration or as a completed FyndHacks submission.
 - [ ] Use only synthetic or challenge-provided data. Check that the repository,
   ZIP, reports, and video contain no credentials, personal data, or
   proprietary material.
-- [ ] Review the 6-minute-53-second
+- [ ] Review the 7-8 minute
   `docs/Project Overview Video.mp4` and confirm it accurately represents
-  your project. The original Indian-English narration is preserved, with new
-  animated visuals; review the draft before sharing.
+  your project. It uses a male Indian-English neural voice in the requested
+  style and newly animated visuals; the original source video is retained,
+  but its embedded narration is not reused.
 - [ ] Upload the reviewed video to YouTube as **Unlisted** and add its URL to
   the submission form. The video has not been uploaded and no YouTube URL is
   included in this repository.
@@ -39,19 +40,18 @@ integration or as a completed FyndHacks submission.
 
 ## Animated walkthrough sections
 
-The narration and animated scenes follow these approximate section boundaries:
+The video moves through nine animated scenes in this order:
 
-1. **0:00-0:50 - Goal and scope:** Identify the SDET Intern practice project
-   and synthetic-data boundaries.
-2. **0:50-1:34 - Source contract:** Explain the seven-column CSV schema.
-3. **1:34-2:18 - Validation:** Show normalization, valid rows, and rejects.
-4. **2:18-2:56 - Deduplication:** Show stable ordering and latest-update wins.
-5. **2:56-3:36 - Loading:** Explain the SQLite upsert and constraints.
-6. **3:36-4:17 - Accounting:** Reconcile rejected, duplicate, and loaded rows.
-7. **4:17-4:52 - Quality gate:** Show the post-load checks.
-8. **4:52-5:31 - Tests:** Cover contract, boundary, negative, and release tests.
-9. **5:31-6:11 - Run evidence:** Show the sample counts and validation output.
-10. **6:11-6:53 - Close:** State limitations and submission checks.
+1. Overall project scope: the shop and data pipeline.
+2. The six-product storefront and cart interactions.
+3. Checkout validation and fixed-price handling.
+4. Local order API, CSV persistence, ETL, SQLite, and confirmation details.
+5. ETL extraction, schema contract, transformations, and rejects.
+6. Composite `(order_id, sku)` identity and safe upserts.
+7. Row accounting and the release quality gate.
+8. ETL and browser test evidence.
+9. End-to-end recap and honest project boundaries.
 
-Keep the video within 7-10 minutes, avoid showing secrets or personal data, and
-test the unlisted link from a signed-out browser before sharing it.
+The rendered runtime is 7:39, within the generator's enforced 7-8 minute
+target. Avoid showing secrets or personal data, and test the unlisted link from
+a signed-out browser before sharing it.

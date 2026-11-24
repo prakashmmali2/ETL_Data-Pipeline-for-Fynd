@@ -5,13 +5,16 @@
 This project demonstrates the development and testing of a small ETL
 (Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
 
-The pipeline reads order data from a CSV file, validates and transforms
-records, handles duplicate SKUs, separates invalid records with rejection
-reasons, and stores valid data in an SQLite database. The focus is software
-testing, data quality, and release validation using practical SDET workflows.
+The pipeline reads order lines from a CSV file, validates and transforms
+records, handles duplicate order/SKU lines, separates invalid records with
+rejection reasons, and stores valid data in an SQLite database. The focus is
+software testing, data quality, and release validation using practical SDET
+workflows.
 
-This is a local practice project using synthetic data. It is not connected to
-Fynd production systems or an official FyndHacks solution.
+The local shop demo also sends synthetic customer orders through the same ETL
+validation and SQLite quality gate before showing an order confirmation. This
+is a practice project; it is not connected to Fynd production systems or an
+official FyndHacks solution.
 
 ## Tech stack
 
@@ -27,27 +30,36 @@ Fynd production systems or an official FyndHacks solution.
 
 ## Project workflow
 
-This repository keeps two independent but complementary test workflows.
+The generated ETL fixture and the local shop are two complementary input
+workflows. The shop-to-ETL connection is local and synchronous for this demo.
 
 ### ETL data-quality workflow
 
 1. Generate deterministic synthetic order data.
-2. Read the CSV and validate its seven-column schema.
+2. Read the CSV and validate its order-line schema.
 3. Normalize and validate each row.
 4. Reject invalid rows with clear reasons.
-5. Resolve duplicate SKUs deterministically, keeping the latest update.
-6. Load valid records into SQLite using an upsert.
+5. Resolve duplicate `(order_id, sku)` lines deterministically, keeping the
+   latest update. The same SKU in different orders is preserved.
+6. Load valid records into SQLite using a composite-key upsert.
 7. Check row accounting, data quality, and release readiness.
 8. Run automated tests and produce a JUnit report.
 
-### Checkout browser workflow
+### Shop-to-ETL workflow
 
-1. Add either of the two fixed-price synthetic products.
+1. Load six fixed-price synthetic products from `checkout/catalog.json`.
 2. Change quantities or remove items and verify the displayed totals.
-3. Enter a required customer name and place the order.
-4. Verify empty-cart and missing-name validation, then confirm one order with a
-   reference.
-5. Run isolated Playwright checks in Chromium.
+3. Enter a required customer name. The local Python service rechecks products,
+   quantities, and prices on the server; the browser never chooses the price.
+4. Save order lines to `data/store/store_orders.csv`, run the ETL pipeline,
+   and validate the resulting SQLite table.
+5. Show a separate confirmation page using the order retrieved from SQLite.
+6. Run isolated Playwright checks in Chromium.
+
+The store service is a local learning demo, not a production order service:
+orders are written to local files, there is no payment, login, shipping, or
+cloud deployment, and the request handler is intended to run only on the
+loopback interface.
 
 ## Setup and execution
 
@@ -117,33 +129,44 @@ UTC. Invalid rows and their rejection reasons are written to
 `data/rejects.csv`.
 
 The release check verifies the SQLite schema, row count, required values, SKU
-uniqueness, and numeric ranges, including integral quantities and finite
-prices. It exits with an error if a check fails. The tests cover the CSV
-contract, transformations, duplicate handling, upserts, rejects, quality
-checks, and the optional watcher. GitHub Actions runs the tests and release
-check; the JUnit report is uploaded as a workflow artifact.
+uniqueness within an order, and numeric ranges, including integral quantities
+and finite prices. It exits with an error if a check fails. The tests cover
+the CSV contract, transformations, duplicate handling, legacy-table
+migration, upserts, rejects, quality checks, and the optional watcher.
+GitHub Actions runs the tests and release check; the JUnit report is uploaded
+as a workflow artifact.
 
-## Mini checkout browser demo
+## Local shop and checkout demo
 
-The independent `checkout/` page demonstrates a two-product checkout with
-fixed prices, quantity controls, validation, and a single order confirmation.
-It uses only local files: there is no payment flow, backend, database, or
-external service. It complements the ETL workflow without changing it.
+The `checkout/` page has a responsive product collection, editable bag, name
+validation, exact fixed-price totals, and an order-details confirmation page.
+The Python service is the small bridge from the shop to ETL. Each accepted
+order is appended to a raw CSV, validated and loaded into the composite-key
+SQLite table, then read back for its confirmation page. The same product can
+appear in many customer orders without overwriting earlier ones.
 
-Run the page from the repository root:
+Start the shop service from the repository root:
 
 ```powershell
-python -m http.server 8000 --directory checkout
+python -m src.store_server --host 127.0.0.1 --port 8000 --data-dir data/store
 ```
 
-Open <http://127.0.0.1:8000> in a browser. Install Chromium as described in
-[Setup and execution](#setup-and-execution) before running browser tests.
+Open <http://127.0.0.1:8000> in a browser. Completed synthetic orders are
+available in `data/store/store_orders.csv` and
+`data/store/store_orders.sqlite`; that local runtime folder is git-ignored.
+The catalog and prices are maintained in `checkout/catalog.json`.
 
-Run the three isolated checkout browser checks:
+Install Chromium as described in [Setup and execution](#setup-and-execution)
+before running the checkout browser tests. The browser checks run the local
+service with a temporary data directory:
 
 ```powershell
 python -m pytest -q tests/test_checkout_browser.py
 ```
+
+The automated cases cover successful saved orders, missing names, exact
+quantity totals, empty carts, rapid repeat clicks, and the same SKU in separate
+customer orders.
 
 Run the ETL and checkout tests together and save their JUnit report:
 
@@ -156,16 +179,24 @@ automated coverage and the manual empty-cart and rapid double-click checks.
 
 ## Walkthrough video
 
-The [animated project walkthrough](docs/Project%20Overview%20Video.mp4) uses
-the original Indian-English narration and illustrates the ETL flow,
-validation, duplicate resolution, SQLite upsert, row accounting, quality
-checks, and test coverage. The original source video is retained.
+The [animated project walkthrough](docs/Project%20Overview%20Video.mp4) tells
+the end-to-end story: overall project scope, the storefront, checkout,
+order-to-ETL flow, transformation, composite order-line keys, SQLite,
+accounting, quality checks, and browser/ETL tests. It uses a male
+Indian-English neural voice in the requested style and animated illustrations
+rather than static presentation slides. The original source video is retained.
 
 Rebuild the animated video from the project directory with:
 
 ```powershell
+python -m pip install -r requirements.txt
 python docs\generate_indian_walkthrough.py
 ```
+
+The video generator uses `en-IN-PrabhatNeural` through `edge-tts`; rebuilding
+requires an internet connection to the speech service. The narration is
+synthesized from the script in the generator. No project data or customer
+records are sent for narration.
 
 The [ETL test plan](docs/test-plan.md) describes expected behavior and manual
 checks. The [checkout test plan and results](docs/checkout-test-plan.md) records
@@ -203,9 +234,10 @@ FyndHacks confirms the submission.
 - `src/etl_pipeline.py` validates, transforms, and loads orders.
 - `src/dq_checks.py` contains the SQLite quality checks.
 - `src/report.py` runs the release check.
+- `src/store_server.py` serves the demo shop and persists orders through ETL.
 - `tests/` contains the automated tests.
 - `docs/test-plan.md` describes the expected behavior and criteria.
-- `checkout/` contains the standalone checkout page.
+- `checkout/` contains the product catalog, shop page, and confirmation page.
 - `tests/test_checkout_browser.py` automates checkout behavior in Chromium.
 - `docs/checkout-test-plan.md` records checkout risks, tests, and results.
 - `docs/submission-checklist.md` lists submission steps and video topics.

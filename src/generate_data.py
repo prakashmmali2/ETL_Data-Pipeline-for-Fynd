@@ -20,6 +20,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
             {
                 "order_id": f"ORD-{index + 1:05d}",
                 "customer_id": f"CUST-{index % 80 + 1:04d}",
+                "customer_name": f"Customer {index % 80 + 1:04d}",
                 "sku": f"sku-{index + 1:05d}",
                 "quantity": index % 8 + 1,
                 "unit_price": round(4.99 + (index % 200) * 0.75, 2),
@@ -28,13 +29,12 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
             }
         )
 
-    # These arrive after the original records but carry newer update times.
+    # These updates arrive later for the same order/SKU pairs.
     for index in range(5):
         row = rows[index].copy()
         newer = start + timedelta(days=2, minutes=index)
         row.update(
             {
-                "order_id": f"ORD-LATE-{index + 1:03d}",
                 "quantity": 20 + index,
                 "updated_at": newer.isoformat(),
             }
@@ -45,6 +45,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         {
             "order_id": "ORD-EDGE-001",
             "customer_id": "CUST-EDGE-001",
+            "customer_name": "Edge Customer 001",
             "sku": "sku-edge-001",
             "quantity": 1,
             "unit_price": 0.0,
@@ -54,6 +55,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         {
             "order_id": "ORD-EDGE-002",
             "customer_id": "CUST-EDGE-002",
+            "customer_name": "Edge Customer 002",
             "sku": "sku-edge-002",
             "quantity": 1000,
             "unit_price": 0.01,
@@ -63,6 +65,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         {
             "order_id": "ORD-EDGE-003",
             "customer_id": "CUST-EDGE-003",
+            "customer_name": "Edge Customer 003",
             "sku": "sku-edge-003",
             "quantity": 2,
             "unit_price": 999999.99,
@@ -72,6 +75,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         {
             "order_id": "ORD-EDGE-004",
             "customer_id": "CUST-EDGE-004",
+            "customer_name": "Edge Customer 004",
             "sku": "sku-edge-004",
             "quantity": 500,
             "unit_price": 12.5,
@@ -81,6 +85,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         {
             "order_id": "ORD-EDGE-005",
             "customer_id": "CUST-EDGE-005",
+            "customer_name": "Edge Customer 005",
             "sku": "sku-edge-005",
             "quantity": 10,
             "unit_price": 0.5,
@@ -112,6 +117,7 @@ def generate_data(output_csv: str | Path) -> pd.DataFrame:
         row = {
             "order_id": f"ORD-BAD-{index + 1:03d}",
             "customer_id": "CUST-9999",
+            "customer_name": "Defect Fixture",
             "sku": f"bad-{index + 1:03d}",
             "quantity": 1,
             "unit_price": 9.99,

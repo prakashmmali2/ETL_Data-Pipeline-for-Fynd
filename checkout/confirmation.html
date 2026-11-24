@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f6f1">
+    <meta name="description" content="Your Fieldnotes Supply order details.">
+    <title>Your order | Fieldnotes Supply</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="confirmation.js" defer></script>
+  </head>
+  <body class="confirmation-page">
+    <div class="announcement">A little more joy in the everyday <span aria-hidden="true">✳</span> Thoughtfully made, always.</div>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Fieldnotes Supply home">
+        <span class="brand-mark" aria-hidden="true">f.</span>
+        <span>fieldnotes<span class="brand-light"> supply</span></span>
+      </a>
+      <span class="secure-note"><span aria-hidden="true">◇</span> LOCAL DEMO ORDER</span>
+    </header>
+    <main class="confirmation-shell">
+      <p class="eyebrow confirmation-kicker"><span aria-hidden="true">✳</span> THANK YOU, THAT’S LOVELY</p>
+      <div id="confirmation-loading" class="order-loading" role="status">Finding your order…</div>
+      <p id="confirmation-error" class="error-message confirmation-error" role="alert" hidden></p>
+      <section id="order-confirmation" class="confirmation-card" aria-labelledby="confirmation-title" hidden>
+        <div class="confirmation-success">
+          <span class="success-mark" aria-hidden="true">✓</span>
+          <div>
+            <p class="eyebrow">YOUR ORDER IS CONFIRMED</p>
+            <h1 id="confirmation-title">Thank you, <span id="customer-name"></span>.</h1>
+            <p class="confirmation-message">We’ve saved your order. Here’s a little reminder of what you picked.</p>
+          </div>
+        </div>
+        <div class="order-reference">
+          <span>ORDER REFERENCE</span>
+          <strong id="order-reference" data-testid="order-reference"></strong>
+        </div>
+        <div class="order-meta">
+          <div><span>Placed</span><strong id="order-date"></strong></div>
+          <div><span>Made out to</span><strong id="order-customer"></strong></div>
+        </div>
+        <div class="confirmed-items-heading">
+          <h2>Your picked things</h2>
+          <span id="confirmed-item-count"></span>
+        </div>
+        <ul id="confirmed-items" class="confirmed-items" aria-label="Confirmed order items"></ul>
+        <div class="confirmed-total">
+          <span>Total</span>
+          <strong id="confirmed-total" data-testid="confirmed-total"></strong>
+        </div>
+        <p class="demo-order-note">This is a practice order, not a payment or shipment. Your order details have been run through the local ETL demo.</p>
+        <a class="continue-shopping" href="/">Back to the collection <span aria-hidden="true">→</span></a>
+      </section>
+      <a id="back-home" class="back-home" href="/" hidden>Back to the collection</a>
+    </main>
+    <footer class="page-footer">
+      <a class="brand footer-brand" href="/" aria-label="Fieldnotes Supply home">
+        <span class="brand-mark" aria-hidden="true">f.</span>
+        <span>fieldnotes<span class="brand-light"> supply</span></span>
+      </a>
+      <span>A small, local checkout demo · Synthetic products · No payment service</span>
+    </footer>
+  </body>
+</html>

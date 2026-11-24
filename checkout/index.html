@@ -3,144 +3,119 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f4ef">
-    <title>Fieldnotes Supply | Checkout demo</title>
+    <meta name="theme-color" content="#f7f6f1">
+    <meta name="description" content="Thoughtful everyday objects from Fieldnotes Supply.">
+    <title>Fieldnotes Supply | Everyday things, thoughtfully made</title>
     <link rel="stylesheet" href="styles.css">
     <script src="app.js" defer></script>
   </head>
   <body>
+    <div class="announcement">A little more joy in the everyday <span aria-hidden="true">✳</span> Thoughtfully made, always.</div>
     <header class="site-header">
-      <a class="brand" href="#" aria-label="Fieldnotes Supply home">
-        <span class="brand-mark" aria-hidden="true">F</span>
+      <a class="brand" href="/" aria-label="Fieldnotes Supply home">
+        <span class="brand-mark" aria-hidden="true">f.</span>
         <span>fieldnotes<span class="brand-light"> supply</span></span>
       </a>
-      <span class="demo-label"><span class="status-dot" aria-hidden="true"></span> CHECKOUT DEMO</span>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a href="#collection">Shop the collection</a>
+        <a href="#our-note">Our note</a>
+      </nav>
+      <a class="bag-link" href="#your-order" aria-label="Your bag, 0 items">
+        <span class="bag-glyph" aria-hidden="true">▱</span>
+        <span>Bag</span>
+        <span id="bag-count" class="bag-count" data-testid="bag-count">0</span>
+      </a>
     </header>
 
-    <main class="page-shell">
-      <section class="intro" aria-labelledby="page-title">
-        <p class="eyebrow">A SMALL, TESTABLE STORE</p>
-        <h1 id="page-title">Checkout, made clear.</h1>
-        <p class="intro-copy">A simple order flow with honest totals and helpful feedback.</p>
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span aria-hidden="true">✳</span> OBJECTS FOR EVERYDAY LIVING</p>
+          <h1 id="hero-title">A softer kind<br>of <em>everyday.</em></h1>
+          <p>Useful little things, made with care and chosen to bring a bit more meaning to the everyday.</p>
+          <a class="hero-link" href="#collection">Find your everyday thing <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="hero-sun"></div>
+          <span class="hero-object hero-object-one">👜</span>
+          <span class="hero-object hero-object-two">☕</span>
+          <span class="hero-object hero-object-three">📓</span>
+          <span class="hero-art-note">MADE FOR THE MOMENTS IN BETWEEN</span>
+        </div>
+        <span class="hero-index" aria-hidden="true">01 — 06</span>
       </section>
 
-      <div class="checkout-grid">
-        <section class="products-panel" aria-labelledby="products-heading">
-          <div class="section-heading">
+      <section id="collection" class="shop-layout" aria-labelledby="collection-title">
+        <div class="collection">
+          <div class="collection-heading">
             <div>
-              <p class="eyebrow">THE COLLECTION</p>
-              <h2 id="products-heading">Choose your goods</h2>
+              <p class="eyebrow">THE GOOD THINGS</p>
+              <h2 id="collection-title">Everyday, considered.</h2>
+              <p class="section-copy">A small collection for wherever the day takes you.</p>
             </div>
-            <span class="item-count">2 items</span>
+            <span id="product-count" class="product-count">Loading collection…</span>
           </div>
+          <p id="catalog-error" class="error-message" role="alert" hidden></p>
+          <div id="product-list" class="product-grid" aria-live="polite"></div>
+          <p class="catalog-note">Small-batch favorites <span aria-hidden="true">✳</span> Fixed prices, no surprises.</p>
+        </div>
 
-          <div class="product-list">
-            <article class="product-card">
-              <div class="product-art tote-art" aria-hidden="true">
-                <svg viewBox="0 0 180 150" role="presentation">
-                  <path d="M56 48V35a34 34 0 0 1 68 0v13" class="tote-handle"/>
-                  <path d="M43 47h94l9 88H34z" class="tote-body"/>
-                  <path d="M65 68h50v34H65z" class="tote-pocket"/>
-                  <path d="M76 83h28" class="tote-stitch"/>
-                </svg>
-                <span class="art-caption">01 / CARRY</span>
-              </div>
-              <div class="product-info">
-                <div class="product-title-row">
-                  <div>
-                    <p class="product-category">EVERYDAY GOODS</p>
-                    <h3>Canvas Tote</h3>
-                  </div>
-                  <span class="product-price">$24.50</span>
-                </div>
-                <p class="product-description">A sturdy cotton carry-all for the everyday.</p>
-                <button class="add-button" type="button" data-add-product="tote">
-                  Add Canvas Tote to cart <span aria-hidden="true">+</span>
-                </button>
-              </div>
-            </article>
-
-            <article class="product-card">
-              <div class="product-art mug-art" aria-hidden="true">
-                <svg viewBox="0 0 180 150" role="presentation">
-                  <path d="M48 46h76v72a20 20 0 0 1-20 20H68a20 20 0 0 1-20-20z" class="mug-body"/>
-                  <path d="M124 60h11a22 22 0 0 1 0 44h-11" class="mug-handle"/>
-                  <path d="M62 64h48" class="mug-glaze"/>
-                  <path d="M70 87h30" class="mug-stamp"/>
-                </svg>
-                <span class="art-caption">02 / SIP</span>
-              </div>
-              <div class="product-info">
-                <div class="product-title-row">
-                  <div>
-                    <p class="product-category">SLOW MORNINGS</p>
-                    <h3>Stoneware Mug</h3>
-                  </div>
-                  <span class="product-price">$12.00</span>
-                </div>
-                <p class="product-description">A hand-finished mug for your favorite pour.</p>
-                <button class="add-button" type="button" data-add-product="mug">
-                  Add Stoneware Mug to cart <span aria-hidden="true">+</span>
-                </button>
-              </div>
-            </article>
-          </div>
-
-          <p class="catalog-note"><span aria-hidden="true">✳</span> Fixed prices · Synthetic demo products</p>
-        </section>
-
-        <aside class="order-panel" aria-labelledby="order-heading">
-          <div class="section-heading order-heading">
+        <aside id="your-order" class="order-panel" aria-labelledby="order-heading">
+          <div class="order-panel-heading">
             <div>
-              <p class="eyebrow">YOUR ORDER</p>
-              <h2 id="order-heading">Order summary</h2>
+              <p class="eyebrow">READY WHEN YOU ARE</p>
+              <h2 id="order-heading">Your bag <span id="bag-heading-count">(0)</span></h2>
             </div>
-            <span class="bag-icon" aria-hidden="true">▱</span>
+            <span class="summary-bag" aria-hidden="true">▱</span>
           </div>
-
           <div class="cart-content">
-            <p id="empty-cart" class="empty-cart">Your cart is empty. Add something you love.</p>
-            <ul id="cart-items" class="cart-items" aria-label="Items in your cart"></ul>
+            <p id="empty-cart" class="empty-cart">
+              <span class="empty-bag" aria-hidden="true">⌑</span>
+              Your bag is waiting for something lovely.
+            </p>
+            <ul id="cart-items" class="cart-items" aria-label="Items in your bag"></ul>
           </div>
-
           <div class="order-total">
-            <span>Order total</span>
+            <span>Subtotal</span>
             <span id="order-total" class="total-amount" data-testid="order-total" aria-live="polite" aria-atomic="true">$0.00</span>
           </div>
+          <p class="shipping-note"><span aria-hidden="true">♡</span> Shipping is on us for this little demo.</p>
 
           <form id="checkout-form" class="checkout-form" novalidate>
-            <label for="customer-name">Your name <span aria-hidden="true">*</span></label>
+            <label for="customer-name">Name for your order <span aria-hidden="true">*</span></label>
             <input
               id="customer-name"
               name="customerName"
               type="text"
               autocomplete="name"
+              maxlength="80"
               aria-describedby="name-hint checkout-error"
               aria-required="true"
               required
               placeholder="e.g. Alex Morgan"
             >
-            <p id="name-hint" class="field-hint">We’ll use this on your order confirmation.</p>
+            <p id="name-hint" class="field-hint">Just so we know who to make it out to.</p>
             <p id="checkout-error" class="error-message" role="alert" hidden></p>
-            <button id="place-order" class="place-order" type="submit">Place order <span aria-hidden="true">→</span></button>
+            <button id="place-order" class="place-order" type="submit">
+              <span>Place your order</span><span aria-hidden="true">→</span>
+            </button>
           </form>
-
-          <section id="order-confirmation" class="confirmation" role="status" aria-live="polite" aria-atomic="true" hidden>
-            <span class="confirmation-check" aria-hidden="true">✓</span>
-            <div>
-              <h3 id="confirmation-title"></h3>
-              <p id="confirmation-reference"></p>
-            </div>
-          </section>
-
-          <p class="privacy-note"><span aria-hidden="true">◇</span> Demo only. No payment or personal data is sent anywhere.</p>
+          <p class="privacy-note"><span aria-hidden="true">◇</span> Practice shop only. No payment is collected.</p>
         </aside>
-      </div>
+      </section>
 
-      <footer class="page-footer">
-        <span>FIELDNOTES SUPPLY</span>
-        <span>Made for clear totals and calmer checkouts.</span>
-      </footer>
+      <section id="our-note" class="values-strip" aria-label="Our values">
+        <div><span aria-hidden="true">✳</span><p>Made with intention</p></div>
+        <div><span aria-hidden="true">♡</span><p>Useful, for a long time</p></div>
+        <div><span aria-hidden="true">⌂</span><p>Little joys, every day</p></div>
+      </section>
     </main>
+    <footer class="page-footer">
+      <a class="brand footer-brand" href="/" aria-label="Fieldnotes Supply home">
+        <span class="brand-mark" aria-hidden="true">f.</span>
+        <span>fieldnotes<span class="brand-light"> supply</span></span>
+      </a>
+      <span>A small, local checkout demo · Synthetic products · No payment service</span>
+    </footer>
   </body>
 </html>

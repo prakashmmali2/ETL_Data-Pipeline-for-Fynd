@@ -1,0 +1,62 @@
+[
+  {
+    "id": "tote",
+    "name": "Canvas Tote",
+    "category": "Everyday carry",
+    "description": "A sturdy organic-cotton carry-all, ready for the long way home.",
+    "price_cents": 2450,
+    "icon": "👜",
+    "tone": "sage",
+    "tag": "BESTSELLER"
+  },
+  {
+    "id": "mug",
+    "name": "Stoneware Mug",
+    "category": "Slow mornings",
+    "description": "A hand-finished, easy-to-hold mug for your favorite pour.",
+    "price_cents": 1200,
+    "icon": "☕",
+    "tone": "clay",
+    "tag": "HAND FINISHED"
+  },
+  {
+    "id": "candle",
+    "name": "Cedar Candle",
+    "category": "At home",
+    "description": "Warm cedar, soft amber, and a little room to unwind.",
+    "price_cents": 1850,
+    "icon": "🕯️",
+    "tone": "sun",
+    "tag": "SMALL BATCH"
+  },
+  {
+    "id": "notebook",
+    "name": "Field Notebook",
+    "category": "Daily rituals",
+    "description": "A lay-flat recycled-paper notebook for thoughts in progress.",
+    "price_cents": 950,
+    "icon": "📓",
+    "tone": "blue",
+    "tag": "MADE TO KEEP"
+  },
+  {
+    "id": "socks",
+    "name": "Everyday Socks",
+    "category": "The little things",
+    "description": "Soft, breathable cotton-knit comfort for wherever the day goes.",
+    "price_cents": 1400,
+    "icon": "🧦",
+    "tone": "rose",
+    "tag": "CUSTOMER FAVORITE"
+  },
+  {
+    "id": "soap",
+    "name": "Botanical Soap Set",
+    "category": "A little care",
+    "description": "Two gentle, plant-based bars with a fresh botanical scent.",
+    "price_cents": 1600,
+    "icon": "🧼",
+    "tone": "mint",
+    "tag": "GIFT READY"
+  }
+]

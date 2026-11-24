@@ -21,6 +21,7 @@ def valid_row(sku: str = "SKU-1", **changes) -> dict:
     row = {
         "order_id": "ORD-1",
         "customer_id": "CUST-1",
+        "customer_name": "Customer One",
         "sku": sku,
         "quantity": 2,
         "unit_price": 12.5,
@@ -115,18 +116,24 @@ def test_string_fields_are_trimmed(tmp_path):
 
 
 def test_latest_update_wins_even_when_source_order_is_oldest_last(tmp_path):
-    older = valid_row("SKU-A", order_id="OLD", updated_at="2026-01-01T00:00:00Z")
-    newer = valid_row("SKU-A", order_id="NEW", updated_at="2026-01-03T00:00:00Z")
+    older = valid_row("SKU-A", quantity=1, updated_at="2026-01-01T00:00:00Z")
+    newer = valid_row("SKU-A", quantity=3, updated_at="2026-01-03T00:00:00Z")
     result = run(tmp_path, [newer, older])
     with sqlite3.connect(tmp_path / "target.sqlite") as db:
-        assert db.execute("SELECT order_id FROM orders").fetchone()[0] == "NEW"
+        assert db.execute("SELECT quantity FROM orders").fetchone()[0] == 3
     assert result.duplicates_removed == 1
 
 
 def test_later_source_row_breaks_equal_timestamp_tie(tmp_path):
-    result = run(tmp_path, [valid_row("SKU-A", order_id="FIRST"), valid_row("SKU-A", order_id="LAST")])
+    result = run(
+        tmp_path,
+        [
+            valid_row("SKU-A", customer_name="First"),
+            valid_row("SKU-A", customer_name="Last"),
+        ],
+    )
     with sqlite3.connect(tmp_path / "target.sqlite") as db:
-        assert db.execute("SELECT order_id FROM orders").fetchone()[0] == "LAST"
+        assert db.execute("SELECT customer_name FROM orders").fetchone()[0] == "Last"
     assert result.duplicates_removed == 1
 
 
@@ -149,6 +156,14 @@ def test_blank_required_value_is_rejected(tmp_path):
     result = run(tmp_path, [valid_row(customer_id=" ")])
     assert result.rows_rejected == 1
     assert result.rows_loaded == 0
+
+
+def test_blank_customer_name_is_rejected(tmp_path):
+    result = run(tmp_path, [valid_row(customer_name=" ")])
+    assert result.rows_rejected == 1
+    with (tmp_path / "rejects.csv").open(newline="") as stream:
+        rejected = list(csv.DictReader(stream))
+    assert rejected[0]["reason"] == "missing_customer_name"
 
 
 def test_non_integral_quantity_is_rejected(tmp_path):
@@ -219,11 +234,64 @@ def test_late_older_batch_does_not_regress_existing_row(tmp_path):
         assert db.execute("SELECT order_id FROM orders").fetchone()[0] == "NEW"
 
 
-def test_target_schema_has_sku_primary_key(tmp_path):
+def test_target_schema_uses_order_and_sku_composite_key(tmp_path):
     run(tmp_path, [valid_row()])
     with sqlite3.connect(tmp_path / "target.sqlite") as db:
         primary_keys = [row[1] for row in db.execute("PRAGMA table_info(orders)") if row[5]]
-    assert primary_keys == ["sku"]
+    assert primary_keys == ["order_id", "sku"]
+
+
+def test_same_sku_is_preserved_in_different_orders(tmp_path):
+    run(
+        tmp_path,
+        [
+            valid_row("SKU-SHARED", order_id="ORD-1", customer_id="CUST-1"),
+            valid_row("SKU-SHARED", order_id="ORD-2", customer_id="CUST-2"),
+        ],
+    )
+    with sqlite3.connect(tmp_path / "target.sqlite") as db:
+        rows = db.execute(
+            "SELECT order_id, sku FROM orders ORDER BY order_id"
+        ).fetchall()
+    assert rows == [("ORD-1", "SKU-SHARED"), ("ORD-2", "SKU-SHARED")]
+
+
+def test_existing_sku_key_table_is_migrated_without_losing_rows(tmp_path):
+    database = tmp_path / "target.sqlite"
+    with sqlite3.connect(database) as db:
+        db.execute(
+            """
+            CREATE TABLE orders (
+                sku TEXT PRIMARY KEY,
+                order_id TEXT NOT NULL,
+                customer_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                order_timestamp TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        db.execute(
+            """
+            INSERT INTO orders VALUES
+                ('SKU-OLD', 'ORD-OLD', 'CUST-OLD', 1, 2.5,
+                 '2026-01-01T10:00:00Z', '2026-01-01T10:00:00Z')
+            """
+        )
+
+    source = tmp_path / "source.csv"
+    write_rows(source, [valid_row("SKU-NEW")])
+    run_pipeline(source, database, tmp_path / "rejects.csv")
+
+    with sqlite3.connect(database) as db:
+        rows = db.execute(
+            "SELECT order_id, customer_name, sku FROM orders ORDER BY sku"
+        ).fetchall()
+    assert rows == [
+        ("ORD-1", "Customer One", "SKU-NEW"),
+        ("ORD-OLD", "CUST-OLD", "SKU-OLD"),
+    ]
 
 
 def test_source_contract_rejects_missing_column(tmp_path):
@@ -278,6 +346,7 @@ def test_quality_gate_catches_deliberately_corrupted_targets(tmp_path, rows, exp
                 sku TEXT,
                 order_id TEXT,
                 customer_id TEXT,
+                customer_name TEXT,
                 quantity INTEGER,
                 unit_price REAL,
                 order_timestamp TEXT,
@@ -288,11 +357,20 @@ def test_quality_gate_catches_deliberately_corrupted_targets(tmp_path, rows, exp
         db.executemany(
             """
             INSERT INTO orders
-                (sku, order_id, customer_id, quantity, unit_price, order_timestamp, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (sku, order_id, customer_id, customer_name, quantity, unit_price, order_timestamp, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                tuple(row[column] for column in ORDER_COLUMNS)
+                tuple(row[column] for column in (
+                    "sku",
+                    "order_id",
+                    "customer_id",
+                    "customer_name",
+                    "quantity",
+                    "unit_price",
+                    "order_timestamp",
+                    "updated_at",
+                ))
                 for row in rows
             ],
         )

@@ -12,6 +12,7 @@ REQUIRED_COLUMNS = {
     "sku",
     "order_id",
     "customer_id",
+    "customer_name",
     "quantity",
     "unit_price",
     "order_timestamp",
@@ -53,12 +54,14 @@ def check_table(database: str | Path, table_name: str = "orders") -> list[CheckR
             WHERE sku IS NULL OR TRIM(sku) = ''
                OR order_id IS NULL OR TRIM(order_id) = ''
                OR customer_id IS NULL OR TRIM(customer_id) = ''
+               OR customer_name IS NULL OR TRIM(customer_name) = ''
                OR quantity IS NULL OR unit_price IS NULL
                OR order_timestamp IS NULL OR updated_at IS NULL
             """
         ).fetchone()[0]
         duplicate_count = connection.execute(
-            f'SELECT COUNT(*) FROM (SELECT sku FROM "{table_name}" GROUP BY sku HAVING COUNT(*) > 1)'
+            f'SELECT COUNT(*) FROM (SELECT order_id, sku FROM "{table_name}" '
+            f'GROUP BY order_id, sku HAVING COUNT(*) > 1)'
         ).fetchone()[0]
         invalid_count = connection.execute(
             f"""
@@ -76,7 +79,7 @@ def check_table(database: str | Path, table_name: str = "orders") -> list[CheckR
         CheckResult("schema", schema_ok, "Required target columns are present"),
         CheckResult("row_count", row_count > 0, f"{row_count} rows loaded"),
         CheckResult("null_handling", null_count == 0, f"{null_count} rows contain required null/blank values"),
-        CheckResult("duplicates", duplicate_count == 0, f"{duplicate_count} duplicate SKUs"),
+        CheckResult("duplicates", duplicate_count == 0, f"{duplicate_count} duplicate order/SKU lines"),
         CheckResult("value_ranges", invalid_count == 0, f"{invalid_count} rows violate numeric constraints"),
     ]
 
