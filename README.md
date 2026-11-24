@@ -1,4 +1,4 @@
-## Order ETL ETL Data Pipeline – Test Automation & Quality Engineering : Project Overview
+## Order ETL Data Pipeline – Test Automation & Quality Engineering : Project Overview
 
 This project demonstrates the development and testing of a small ETL (Extract, Transform, Load) pipeline using Python, CSV, and SQLite.
 
@@ -85,5 +85,5 @@ Total records read                                             20,020
 Rejected records                                                 15
 
 Duplicate records removed                                        5
--------------------------------------------------------------------------------
+
 Successfully loaded records                                    20,000
