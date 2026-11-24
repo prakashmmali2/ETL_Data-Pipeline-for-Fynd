@@ -10,22 +10,34 @@ The main focus of this project is software testing, data quality, and release va
 ## Tech Stack
 
 Programming: Python 3.10+
+
 Database: SQLite
+
 Data Format: CSV
+
 Testing: Pytest
+
 CI/CD: GitHub Actions
+
 Test Reporting: JUnit XML
 
 
 ## Project Workflow
 
 - Generate synthetic order data.
+
 - Read and validate CSV records.
+
 - Apply data cleaning and transformation.
+
 - Identify and remove duplicate SKUs.
+
 - Store invalid records with rejection reasons.
+
 - Load valid records into SQLite.
+
 - Execute automated tests and data quality checks.
+
 - Generate test reports and verify release readiness.
 
 ## Run it
